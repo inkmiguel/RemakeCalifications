@@ -1,0 +1,322 @@
+/* Contenedor principal del login */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100vw;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  padding: 20px;
+  box-sizing: border-box;
+  overflow: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
+}
+
+/* Tarjeta del formulario */
+.login-card {
+  background: transparent;
+  backdrop-filter: none;
+  border-radius: 0;
+  padding: 40px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: none;
+  border: none;
+}
+
+/* Header del login */
+.login-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.login-header h2 {
+  color: white;
+  font-size: 28px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.login-header p {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  margin: 0;
+}
+
+/* Formulario */
+.login-form {
+  width: 100%;
+}
+
+/* Grupos de formulario */
+.form-group {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: white;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 12px 45px 12px 15px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  backdrop-filter: blur(10px);
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+}
+
+.form-group input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Iconos en los inputs */
+.form-group i {
+  position: absolute;
+  right: 15px;
+  top: 38px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 18px;
+}
+
+.icon-email::before {
+  content: "📧";
+}
+
+.icon-password::before {
+  content: "🔒";
+}
+
+/* Opciones del formulario */
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+  font-size: 14px;
+}
+
+.remember-me {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.remember-me input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.remember-me label {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+}
+
+.forgot-password {
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.forgot-password:hover {
+  text-decoration: underline;
+}
+
+/* Botón de login */
+.login-btn {
+  width: 100%;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 25px;
+  backdrop-filter: blur(10px);
+}
+
+.login-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.login-btn:active {
+  transform: translateY(0);
+}
+
+/* Footer del login */
+.login-footer {
+  text-align: center;
+  margin-bottom: 25px;
+}
+
+.login-footer p {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  margin: 0;
+}
+
+.register-link {
+  color: white;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.register-link:hover {
+  text-decoration: underline;
+}
+
+/* Login social */
+.social-login {
+  margin-top: 20px;
+}
+
+.divider {
+  text-align: center;
+  margin: 20px 0;
+  position: relative;
+}
+
+.divider::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.divider span {
+  background: transparent;
+  padding: 0 15px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+}
+
+.social-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.social-btn {
+  flex: 1;
+  padding: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.social-btn:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.social-btn.google:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.social-btn.facebook:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.icon-google::before {
+  content: "🌐";
+}
+
+.icon-facebook::before {
+  content: "📘";
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .login-container {
+    padding: 10px;
+  }
+  
+  .login-card {
+    padding: 30px 20px;
+  }
+  
+  .login-header h2 {
+    font-size: 24px;
+  }
+  
+  .social-buttons {
+    flex-direction: column;
+  }
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.login-card {
+  animation: fadeIn 0.6s ease-out;
+}
+
+/* Estados de validación */
+.form-group input:invalid {
+  border-color: rgba(255, 100, 100, 0.8);
+}
+
+.form-group input:valid {
+  border-color: rgba(100, 255, 100, 0.8);
+}
+
+/* Loading state para el botón */
+.login-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.login-btn:disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
