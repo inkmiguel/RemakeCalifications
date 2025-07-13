@@ -1,0 +1,387 @@
+/* Variables CSS para consistencia */
+:root {
+  --primary-color: #6366f1;
+  --primary-hover: #5856f0;
+  --secondary-color: #f8fafc;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --border-color: #e2e8f0;
+  --error-color: #ef4444;
+  --success-color: #22c55e;
+  --shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  --shadow-hover: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+html, body {
+  background: transparent !important;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+}
+
+/* Container principal */
+.signup-container {
+  min-height: 100vh;
+  height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow: hidden;
+}
+
+/* Tarjeta del formulario */
+.signup-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  width: 100%;
+  max-width: 400px;
+  min-height: 400px;
+  max-height: 90vh;
+  padding: 20px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.signup-card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-hover);
+}
+
+/* Header del formulario */
+.signup-header {
+  text-align: center;
+  margin-bottom: 15px;
+  flex-shrink: 0;
+}
+
+.signup-header h2 {
+  color: var(--text-primary);
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 4px 0;
+  letter-spacing: -0.5px;
+}
+
+.signup-header p {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin: 0;
+  font-weight: 400;
+}
+
+/* Formulario */
+.signup-form {
+  margin-bottom: 12px;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Grupos de formulario */
+.form-group {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.form-group label {
+  display: block;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  letter-spacing: 0.2px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 10px 12px 10px 35px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--secondary-color);
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  background: white;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.form-group input::placeholder {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+/* Iconos en los inputs */
+.form-group i {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
+  font-size: 14px;
+  pointer-events: none;
+  transition: color 0.3s ease;
+}
+
+.form-group input:focus + i {
+  color: var(--primary-color);
+}
+
+/* Iconos específicos con pseudo-elementos */
+.icon-email::before {
+  content: "✉";
+}
+
+.icon-password::before {
+  content: "🔒";
+}
+
+/* Opciones del formulario */
+.form-options {
+  margin-bottom: 15px;
+}
+
+.terms-accept {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.terms-accept input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--primary-color);
+  cursor: pointer;
+}
+
+.terms-accept label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+  margin: 0;
+}
+
+.terms-link {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.3s ease;
+}
+
+.terms-link:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
+}
+
+/* Botón de registro */
+.signup-btn {
+  width: 100%;
+  background: #111; /* Cambiado a negro */
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  margin-top: 8px;
+}
+
+.signup-btn:hover {
+  background: #222; /* Un negro un poco más claro para hover */
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(17, 17, 17, 0.3);
+}
+
+.signup-btn:active {
+  transform: translateY(0);
+}
+
+/* Footer del formulario */
+.signup-footer {
+  text-align: center;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.signup-footer p {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin: 0;
+}
+
+.login-link {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.3s ease;
+}
+
+.login-link:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
+}
+
+/* Registro social */
+.social-signup {
+  border-top: 1px solid var(--border-color);
+  padding-top: 12px;
+  flex-shrink: 0;
+}
+
+.divider {
+  text-align: center;
+  margin-bottom: 8px;
+  position: relative;
+}
+
+.divider span {
+  background: white;
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 0 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--border-color);
+}
+
+/* Botones sociales */
+.social-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.social-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  background: white;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.social-btn:hover {
+  border-color: var(--primary-color);
+  background: var(--secondary-color);
+  transform: translateY(-2px);
+}
+
+.social-btn.google:hover {
+  border-color: #db4437;
+  color: #db4437;
+}
+
+.social-btn.facebook:hover {
+  border-color: #4267b2;
+  color: #4267b2;
+}
+
+.social-btn i {
+  font-size: 12px;
+}
+
+/* Iconos sociales con pseudo-elementos */
+.icon-google::before {
+  content: "G";
+  color: #db4437;
+  font-weight: bold;
+}
+
+.icon-facebook::before {
+  content: "f";
+  color: #4267b2;
+  font-weight: bold;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .signup-container {
+    padding: 10px;
+  }
+  .signup-card {
+    padding: 20px;
+    max-height: 98vh;
+    min-height: 350px;
+    overflow: hidden;
+  }
+  .signup-header h2 {
+    font-size: 20px;
+  }
+  .social-buttons {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .form-group input {
+    padding: 10px 12px 10px 35px;
+    font-size: 16px; /* Evita zoom en iOS */
+  }
+  .form-group {
+    margin-bottom: 12px;
+  }
+  .form-options {
+    margin-bottom: 16px;
+  }
+}
+
+/* Estados de validación */
+.form-group input:invalid:not(:focus):not(:placeholder-shown) {
+  border-color: var(--error-color);
+}
+
+.form-group input:valid:not(:focus):not(:placeholder-shown) {
+  border-color: var(--success-color);
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.signup-card {
+  animation: fadeIn 0.6s ease-out;
+}

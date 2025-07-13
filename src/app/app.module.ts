@@ -13,13 +13,15 @@ import { environment } from 'src/environments/environment';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 
-import { LoginComponent } from './components/log/login';
+import { LoginComponent } from './components/log/login.component';
+import { SignupComponent } from './components/sign/signup.component';
 import { HomeComponent } from './components/home/home.component';
 
 @NgModule({
   declarations: [
     AppComponent,
     LoginComponent,
+    SignupComponent,
     HomeComponent
   ],
   imports: [

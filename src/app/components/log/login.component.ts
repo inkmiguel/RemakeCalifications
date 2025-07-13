@@ -28,4 +28,9 @@ export class LoginComponent {
             }
         })
      };
+
+     // Método para navegar al registro
+     goToSignup() {
+        this.route.navigate(['/signup']);
+     }
 }
