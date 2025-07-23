@@ -12,10 +12,15 @@ export class HomeComponent {
   historial: Array<{fecha: Date, nombre: string, materia: string, tipo: string, resultado: string}> = [];
   nombre = '';
   materia = '';
-  tipo = ''; // 'tareas', 'tareas_examen', 'examen'
+  tipo = 'tareas'; // 'tareas', 'tareas_examen', 'examen' - Valor por defecto
   calificaciones: (number | null)[] = [null];
   calExamenes: (number | null)[] = [null];
   ponderacionTareas: number = 0.4; // Por defecto 40% tareas, 60% examen
+
+  // Nuevos arrays para datos adicionales de las tareas
+  titulosTareas: string[] = [''];
+  fechasTareas: string[] = [''];
+  descripcionesTareas: string[] = [''];
 
   mostrarResultado = false;
   resultadoTexto = '';
@@ -24,6 +29,33 @@ export class HomeComponent {
   // Configuración para la gráfica de barras
   public barChartOptions: ChartOptions = {
     responsive: true,
+    plugins: {
+      tooltip: {
+        callbacks: {
+          title: (context) => {
+            const index = context[0].dataIndex;
+            // Obtener el número de tareas válidas para determinar si es tarea o examen
+            const tareasValidas = this.calificaciones.filter((cal): cal is number => cal != null && cal > 0);
+            
+            if (index < tareasValidas.length) {
+              // Es una tarea
+              const tareaIndex = this.calificaciones.findIndex((cal, i) => {
+                const validasAntes = this.calificaciones.slice(0, i).filter((c): c is number => c != null && c > 0).length;
+                return cal != null && cal > 0 && validasAntes === index;
+              });
+              return this.titulosTareas[tareaIndex] || `Tarea ${index + 1}`;
+            } else {
+              // Es un examen
+              const examenIndex = index - tareasValidas.length;
+              return `Examen ${examenIndex + 1}`;
+            }
+          },
+          label: (context) => {
+            return `Calificación: ${context.parsed.y}`;
+          }
+        }
+      }
+    }
   };
   public barChartLabels: string[] = [];
   public barChartType: ChartType = 'bar';
@@ -46,6 +78,9 @@ export class HomeComponent {
   }
   agregarCalificacion(): void {
     this.calificaciones.push(null);
+    this.titulosTareas.push('');
+    this.fechasTareas.push('');
+    this.descripcionesTareas.push('');
   }
 
   agregarExamen(): void {
@@ -62,6 +97,9 @@ export class HomeComponent {
     // No permitir eliminar si solo queda una calificación
     if (this.calificaciones.length > 1) {
       this.calificaciones.splice(index, 1);
+      this.titulosTareas.splice(index, 1);
+      this.fechasTareas.splice(index, 1);
+      this.descripcionesTareas.splice(index, 1);
     }
   }
 

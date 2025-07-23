@@ -54,19 +54,50 @@
         <div class="form-text">Ejemplo: 0.4 significa 40% tareas y 60% examen.</div>
       </div>
 
-      <!-- Calificaciones dinámicas -->
+      <!-- Tareas dinámicas -->
       <div class="mb-3" *ngIf="tipo === 'tareas' || tipo === 'tareas_examen'">
-        <label class="form-label">Calificaciones de tareas</label>
+        <label class="form-label">Tareas</label>
         <div class="form-text mb-2">Los campos se agregan automáticamente. Campos vacíos no se consideran en el cálculo.</div>
-        <div *ngFor="let cal of calificaciones; let i = index" class="input-group mb-2">
-          <input type="number" class="form-control" [(ngModel)]="calificaciones[i]" 
-                 min="0" max="10" step="0.1" name="cal{{i}}" 
-                 placeholder="Calificación {{i + 1}} (opcional)"
-                 (input)="onCalificacionChange(i, $event)"
-                 [disabled]="!calificacionesHabilitadas">
-          <button class="btn btn-outline-danger" type="button" 
-                  (click)="eliminarCalificacion(i)" 
-                  [disabled]="!calificacionesHabilitadas || calificaciones.length === 1">✖</button>
+        
+        <div *ngFor="let cal of calificaciones; let i = index" class="card mb-3">
+          <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+              <h6 class="mb-0">Tarea {{i + 1}}</h6>
+              <button class="btn btn-outline-danger btn-sm" type="button" 
+                      (click)="eliminarCalificacion(i)" 
+                      [disabled]="!calificacionesHabilitadas || calificaciones.length === 1">✖</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6 mb-2">
+                <label class="form-label">Título de la tarea</label>
+                <input type="text" class="form-control" [(ngModel)]="titulosTareas[i]" 
+                       name="titulo{{i}}" placeholder="Título de la tarea"
+                       [disabled]="!calificacionesHabilitadas">
+              </div>
+              <div class="col-md-6 mb-2">
+                <label class="form-label">Fecha de entrega</label>
+                <input type="date" class="form-control" [(ngModel)]="fechasTareas[i]" 
+                       name="fecha{{i}}"
+                       [disabled]="!calificacionesHabilitadas">
+              </div>
+              <div class="col-12 mb-2">
+                <label class="form-label">Descripción</label>
+                <textarea class="form-control" rows="2" [(ngModel)]="descripcionesTareas[i]" 
+                          name="descripcion{{i}}" placeholder="Descripción de la tarea"
+                          [disabled]="!calificacionesHabilitadas"></textarea>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Calificación</label>
+                <input type="number" class="form-control" [(ngModel)]="calificaciones[i]" 
+                       min="0" max="10" step="0.1" name="cal{{i}}" 
+                       placeholder="Calificación (opcional)"
+                       (input)="onCalificacionChange(i, $event)"
+                       [disabled]="!calificacionesHabilitadas">
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
