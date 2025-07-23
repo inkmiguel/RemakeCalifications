@@ -1,23 +1,146 @@
-<div class="home-container">
-  <div class="home-header">
-    <h1>¡Bienvenido!</h1>
-    <p>Has iniciado sesión exitosamente</p>
-  </div>
-  
-  <div class="home-content">
-    <div class="welcome-card">
-      <h2>Panel Principal</h2>
-      <p>Aquí puedes gestionar tus calificaciones y actividades.</p>
-      
-      <div class="action-buttons">
-        <button class="action-btn primary">Ver Calificaciones</button>
-        <button class="action-btn secondary">Agregar Calificación</button>
-        <button class="action-btn secondary">Configuración</button>
-      </div>
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-danger">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#">Evaluador</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbar">
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item">
+          <a class="nav-link active" href="#">Inicio</a>
+        </li>
+      </ul>
+      <button class="btn btn-outline-light" type="button" (click)="logout()">
+        <i class="bi bi-person-circle"></i> Login
+      </button>
     </div>
   </div>
-  
-  <div class="home-footer">
-    <button class="logout-btn" (click)="logout()">Cerrar Sesión</button>
-  </div>
+</nav>
+
+<!-- Contenido -->
+<div class="container mt-4">
+  <div class="row">
+    <!-- Lado Izquierdo: Formulario -->
+    <div class="col-md-6">
+      <h3>Evaluación de Estudiante</h3>
+
+      <div class="mb-3">
+        <label for="nombre" class="form-label">Nombre del alumno</label>
+        <input type="text" id="nombre" class="form-control" [(ngModel)]="nombre" name="nombre">
+      </div>
+
+      <div class="mb-3">
+        <label for="materia" class="form-label">Materia</label>
+        <input type="text" id="materia" class="form-control" [(ngModel)]="materia" name="materia">
+      </div>
+
+      <div class="mb-3">
+        <label for="tipo" class="form-label">Tipo de evaluación</label>
+        <select id="tipo" class="form-select" [(ngModel)]="tipo" name="tipo">
+          <option value="tareas" selected>Solo tareas</option>
+          <option value="tareas_examen">Tareas + Examen</option>
+          <option value="examen">Solo examen</option>
+        </select>
+      </div>
+
+      <!-- Campo de ponderación solo para tareas + examen -->
+      <div class="mb-3" *ngIf="tipo === 'tareas_examen'">
+        <label for="ponderacion" class="form-label">Ponderación de tareas (valor entre 0 y 1)</label>
+        <input type="number" id="ponderacion" class="form-control" 
+               [(ngModel)]="ponderacionTareas" name="ponderacion" 
+               min="0" max="1" step="0.1" 
+               [disabled]="!calificacionesHabilitadas">
+        <div class="form-text">Ejemplo: 0.4 significa 40% tareas y 60% examen.</div>
+      </div>
+
+      <!-- Calificaciones dinámicas -->
+      <div class="mb-3" *ngIf="tipo === 'tareas' || tipo === 'tareas_examen'">
+        <label class="form-label">Calificaciones de tareas</label>
+        <div class="form-text mb-2">Los campos se agregan automáticamente. Campos vacíos no se consideran en el cálculo.</div>
+        <div *ngFor="let cal of calificaciones; let i = index" class="input-group mb-2">
+          <input type="number" class="form-control" [(ngModel)]="calificaciones[i]" 
+                 min="0" max="10" step="0.1" name="cal{{i}}" 
+                 placeholder="Calificación {{i + 1}} (opcional)"
+                 (input)="onCalificacionChange(i, $event)"
+                 [disabled]="!calificacionesHabilitadas">
+          <button class="btn btn-outline-danger" type="button" 
+                  (click)="eliminarCalificacion(i)" 
+                  [disabled]="!calificacionesHabilitadas || calificaciones.length === 1">✖</button>
+        </div>
+      </div>
+
+
+      <!-- Campos dinámicos para exámenes -->
+      <div class="mb-3" *ngIf="tipo === 'tareas_examen' || tipo === 'examen'">
+        <label class="form-label">Calificaciones de exámenes</label>
+        <div class="form-text mb-2">Puedes agregar varios exámenes. Campos vacíos no se consideran en el cálculo.</div>
+        <div *ngFor="let ex of calExamenes; let j = index" class="input-group mb-2">
+          <input type="number" class="form-control" [(ngModel)]="calExamenes[j]"
+                 min="0" max="10" step="0.1" name="examen{{j}}"
+                 placeholder="Calificación Examen {{j + 1}} (opcional)"
+                 (input)="onExamenChange(j, $event)"
+                 [disabled]="!calificacionesHabilitadas">
+          <button class="btn btn-outline-danger" type="button"
+                  (click)="eliminarExamen(j)"
+                  [disabled]="!calificacionesHabilitadas || calExamenes.length === 1">✖</button>
+        </div>
+      </div>
+
+      <button class="btn btn-success" (click)="evaluar()" 
+              [disabled]="!calificacionesHabilitadas">Evaluar</button>
+
+      <div class="mt-3" *ngIf="mostrarResultado">
+        <div class="alert" [ngClass]="resultadoClase">
+          {{ resultadoTexto }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Lado Derecho: Gráfica y Historial -->
+    <div class="col-md-6">
+      <h4>Gráfica / Observaciones</h4>
+      <div class="border rounded p-3 bg-light mb-4" style="min-height: 320px; max-width: 100%; display: flex; align-items: center; justify-content: center;">
+        <canvas baseChart
+                [data]="barChartData"
+                [options]="barChartOptions"
+                [legend]="barChartLegend"
+                [type]="barChartType"
+                style="max-height: 250px; width: 100%;">
+        </canvas>
+      </div>
+
+      <!-- Tabla de historial de evaluaciones solo si usuario está logueado -->
+      <div class="border rounded p-3 bg-white">
+        <ng-container *ngIf="usuarioLogueado; else noLoginMsg">
+          <h5 class="mb-3">Historial de Evaluaciones</h5>
+          <table class="table table-sm table-striped mb-0">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Alumno</th>
+                <th>Materia</th>
+                <th>Tipo</th>
+                <th>Resultado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of historial">
+                <td>{{ item.fecha | date:'short' }}</td>
+                <td>{{ item.nombre }}</td>
+                <td>{{ item.materia }}</td>
+                <td>{{ item.tipo }}</td>
+                <td>{{ item.resultado }}</td>
+              </tr>
+              <tr *ngIf="!historial || historial.length === 0">
+                <td colspan="5" class="text-center text-muted">Sin registros</td>
+              </tr>
+            </tbody>
+          </table>
+        </ng-container>
+        <ng-template #noLoginMsg>
+          <div class="alert alert-info text-center mb-0">Inicia sesión para ver el historial de evaluaciones.</div>
+        </ng-template>
+      </div>
+    </div>
 </div>
