@@ -243,6 +243,10 @@ export class HomeComponent {
 
   logout() {
     // Aquí puedes agregar lógica adicional de logout si es necesario
-    this.router.navigate(['']);
+    this.router.navigate(['/login']);
+  }
+
+  irALogin() {
+    this.router.navigate(['/login']);
   }
 }

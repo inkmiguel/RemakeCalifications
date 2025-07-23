@@ -1,0 +1,9 @@
+.login-prompt {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.login-prompt:hover {
+  background-color: #b3d4ed !important;
+  transform: translateY(-1px);
+}

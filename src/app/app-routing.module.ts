@@ -5,11 +5,11 @@ import { SignupComponent } from './components/sign/signup.component';
 import { HomeComponent } from './components/home/home.component';
 
 const routes: Routes = [
-  { path: '', component: LoginComponent },
+  { path: '', component: HomeComponent },
   { path: 'login', component: LoginComponent },
   { path: 'signup', component: SignupComponent },
   { path: 'home', component: HomeComponent },
-  { path: '**', redirectTo: '' } // Redirect any unknown path to login
+  { path: '**', redirectTo: '' } // Redirect any unknown path to home
 ];
 
 @NgModule({

@@ -170,7 +170,11 @@
           </table>
         </ng-container>
         <ng-template #noLoginMsg>
-          <div class="alert alert-info text-center mb-0">Inicia sesión para ver el historial de evaluaciones.</div>
+          <div class="alert alert-info text-center mb-0 login-prompt" 
+               (click)="irALogin()">
+            <i class="bi bi-box-arrow-in-right me-2"></i>
+            Haz clic aquí para iniciar sesión y ver el historial de evaluaciones.
+          </div>
         </ng-template>
       </div>
     </div>
