@@ -1,15 +1,106 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { ChartOptions, ChartData, ChartType } from 'chart.js';
+import { AuthService } from '../../services/auth.service';
+import { Usuario, EvaluacionHistorial } from '../DB';
+import { Firestore, collection, addDoc, query, where, collectionData, orderBy } from '@angular/fire/firestore';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-home',
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.css']
 })
-export class HomeComponent {
-  usuarioLogueado = false; // Cambia a true cuando el usuario inicie sesión
-  historial: Array<{fecha: Date, nombre: string, materia: string, tipo: string, resultado: string}> = [];
+export class HomeComponent implements OnInit, OnDestroy {
+  usuarioLogueado = false;
+  usuarioActual: Usuario | null = null;
+  private authSubscription?: Subscription;
+  historial: EvaluacionHistorial[] = [];
+
+  constructor(private router: Router, private authService: AuthService, private firestore: Firestore) { 
+    this.historialCollection = collection(this.firestore, 'evaluaciones');
+  }
+
+  ngOnInit() {
+    // Suscribirse al estado de autenticación
+    this.authSubscription = this.authService.usuarioLogueado$.subscribe(usuario => {
+      this.usuarioLogueado = !!usuario;
+      this.usuarioActual = usuario;
+      
+      if (usuario) {
+        this.cargarHistorial();
+      } else {
+        this.historial = [];
+      }
+    });
+  }
+
+  ngOnDestroy() {
+    if (this.authSubscription) {
+      this.authSubscription.unsubscribe();
+    }
+  }
+
+  historialCollection = collection(this.firestore, 'evaluaciones');
+
+  cargarHistorial() {
+    if (!this.usuarioActual) return;
+    
+    const historialQuery = query(
+      this.historialCollection,
+      where('usuarioId', '==', this.usuarioActual.id)
+    );
+    
+    collectionData(historialQuery, { idField: 'id' }).subscribe((data: any[]) => {
+      this.historial = data.map(item => ({
+        ...item,
+        fecha: item.fecha?.toDate ? item.fecha.toDate() : new Date(item.fecha)
+      })).sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()); // Ordenar en el cliente
+    });
+  }
+
+  async guardarEvaluacion(promedio: number, resultadoTexto: string) {
+    if (!this.usuarioActual) return;
+
+    const evaluacion = new EvaluacionHistorial();
+    evaluacion.usuarioId = this.usuarioActual.id;
+    evaluacion.fecha = new Date();
+    evaluacion.nombre = this.nombre;
+    evaluacion.materia = this.materia;
+    evaluacion.tipo = this.tipo;
+    evaluacion.resultado = resultadoTexto;
+    evaluacion.promedio = promedio;
+    
+    // Guardar tareas con datos completos
+    if (this.tipo === 'tareas' || this.tipo === 'tareas_examen') {
+      evaluacion.tareas = this.calificaciones.map((cal, i) => ({
+        titulo: this.titulosTareas[i] || `Tarea ${i + 1}`,
+        fecha: this.fechasTareas[i] || '',
+        descripcion: this.descripcionesTareas[i] || '',
+        calificacion: cal || 0
+      })).filter(tarea => tarea.calificacion > 0);
+    }
+    
+    // Guardar exámenes
+    if (this.tipo === 'tareas_examen' || this.tipo === 'examen') {
+      evaluacion.examenes = this.calExamenes.filter((ex): ex is number => ex != null && ex > 0);
+    }
+    
+    // Guardar ponderación
+    if (this.tipo === 'tareas_examen') {
+      evaluacion.ponderacionTareas = this.ponderacionTareas;
+    }
+
+    try {
+      await addDoc(this.historialCollection, {
+        ...evaluacion,
+        fecha: evaluacion.fecha // Firestore manejará la conversión automáticamente
+      });
+      this.cargarHistorial(); // Recargar el historial
+    } catch (error) {
+      console.error('Error al guardar la evaluación:', error);
+    }
+  }
   nombre = '';
   materia = '';
   tipo = 'tareas'; // 'tareas', 'tareas_examen', 'examen' - Valor por defecto
@@ -70,8 +161,6 @@ export class HomeComponent {
       },
     ],
   };
-
-  constructor(private router: Router) { }
 
     get calificacionesHabilitadas(): boolean {
     return this.tipo !== '';
@@ -238,15 +327,33 @@ export class HomeComponent {
     }
 
     this.mostrarResultado = true;
+    
+    // Guardar en el historial si el usuario está logueado
+    if (this.usuarioLogueado && this.usuarioActual) {
+      this.guardarEvaluacion(promedio, this.resultadoTexto);
+    }
   }
 
 
   logout() {
-    // Aquí puedes agregar lógica adicional de logout si es necesario
+    this.authService.logout();
     this.router.navigate(['/login']);
   }
 
   irALogin() {
     this.router.navigate(['/login']);
+  }
+
+  getTipoDisplay(tipo: string): string {
+    switch(tipo) {
+      case 'tareas': return 'Solo tareas';
+      case 'tareas_examen': return 'Tareas + Examen';
+      case 'examen': return 'Solo examen';
+      default: return tipo;
+    }
+  }
+
+  getPromedioClass(promedio: number): string {
+    return promedio >= 6 ? 'text-success fw-bold' : 'text-danger fw-bold';
   }
 }

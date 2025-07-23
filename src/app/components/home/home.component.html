@@ -152,7 +152,7 @@
                 <th>Alumno</th>
                 <th>Materia</th>
                 <th>Tipo</th>
-                <th>Resultado</th>
+                <th>Promedio</th>
               </tr>
             </thead>
             <tbody>
@@ -160,8 +160,12 @@
                 <td>{{ item.fecha | date:'short' }}</td>
                 <td>{{ item.nombre }}</td>
                 <td>{{ item.materia }}</td>
-                <td>{{ item.tipo }}</td>
-                <td>{{ item.resultado }}</td>
+                <td>{{ getTipoDisplay(item.tipo) }}</td>
+                <td>
+                  <span [ngClass]="getPromedioClass(item.promedio)">
+                    {{ item.promedio.toFixed(2) }}
+                  </span>
+                </td>
               </tr>
               <tr *ngIf="!historial || historial.length === 0">
                 <td colspan="5" class="text-center text-muted">Sin registros</td>
