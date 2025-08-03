@@ -7,3 +7,119 @@
   background-color: #b3d4ed !important;
   transform: translateY(-1px);
 }
+
+/* Estilos para el historial detallado */
+.accordion-button {
+  box-shadow: none;
+  border: none;
+}
+
+.accordion-button:not(.collapsed) {
+  background-color: #f8f9fa;
+}
+
+.accordion-button:focus {
+  box-shadow: none;
+  border: none;
+}
+
+.card-sm .card-body {
+  background-color: #f8f9fa;
+  border-radius: 0.25rem;
+}
+
+.text-truncate {
+  max-width: 180px;
+}
+
+/* Animaciones suaves para los acordeones */
+.accordion-collapse {
+  transition: all 0.3s ease;
+}
+
+/* Mejorar los badges */
+.badge.fs-6 {
+  font-size: 0.9rem !important;
+  padding: 0.375rem 0.75rem;
+  font-weight: 500;
+}
+
+/* Hover effects para las tarjetas de tareas */
+.card-sm {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border: 1px solid #e9ecef;
+}
+
+.card-sm:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* Estilos para los iconos */
+.bi {
+  font-size: 0.9rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .text-truncate {
+    max-width: 120px;
+  }
+  
+  .d-flex.gap-2 {
+    flex-direction: column;
+    gap: 0.5rem !important;
+  }
+  
+  .d-flex.gap-2 .btn {
+    width: 100%;
+  }
+}
+
+/* Estilos para autocompletado de materias */
+.dropdown-menu.show {
+  display: block;
+  border: 1px solid #dee2e6;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.dropdown-item {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.dropdown-item:hover {
+  background-color: #f8f9fa;
+}
+
+.dropdown-item:active {
+  background-color: #e9ecef;
+}
+
+/* Estilos para las tareas previas */
+.alert-info .btn-outline-primary {
+  border-color: #0d6efd;
+  color: #0d6efd;
+  font-size: 0.85rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.alert-info .btn-outline-primary:hover {
+  background-color: #0d6efd;
+  color: white;
+  transform: translateY(-1px);
+}
+
+/* Estilos para mejorar la usabilidad */
+.position-relative {
+  z-index: 1000;
+}
+
+/* Mejorar el espaciado de los botones de tareas previas */
+.d-flex.flex-wrap.gap-1 {
+  gap: 0.375rem !important;
+}
+
+.d-flex.flex-wrap.gap-1 .btn {
+  margin-bottom: 0.25rem;
+}

@@ -21,6 +21,17 @@ export class HomeComponent implements OnInit, OnDestroy {
   modoEdicion = false;
   evaluacionEditando: EvaluacionHistorial | null = null;
 
+  // Variables para autocompletado de materias
+  materiasDisponibles: string[] = [];
+  materiasFiltradas: string[] = [];
+  mostrarSugerenciasMaterias = false;
+  
+  // Variables para tareas previas de la materia
+  tareasPreviasMaterias: { [materia: string]: Array<{titulo: string, descripcion: string}> } = {};
+  
+  // Variable para mostrar información de evaluación existente
+  evaluacionExistenteInfo: EvaluacionHistorial | null = null;
+
   constructor(private router: Router, private authService: AuthService, private firestore: Firestore) { 
     this.historialCollection = collection(this.firestore, 'evaluaciones');
   }
@@ -60,12 +71,73 @@ export class HomeComponent implements OnInit, OnDestroy {
         ...item,
         fecha: item.fecha?.toDate ? item.fecha.toDate() : new Date(item.fecha)
       })).sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()); // Ordenar en el cliente
+      
+      // Extraer materias únicas para autocompletado
+      this.extraerMateriasYTareas();
     });
+  }
+
+  private extraerMateriasYTareas() {
+    const materiasSet = new Set<string>();
+    this.tareasPreviasMaterias = {};
+    
+    this.historial.forEach(evaluacion => {
+      if (evaluacion.materia && evaluacion.materia.trim()) {
+        const materiaKey = evaluacion.materia.toLowerCase().trim();
+        materiasSet.add(evaluacion.materia);
+        
+        // Agrupar tareas por materia
+        if (!this.tareasPreviasMaterias[materiaKey]) {
+          this.tareasPreviasMaterias[materiaKey] = [];
+        }
+        
+        if (evaluacion.tareas && evaluacion.tareas.length > 0) {
+          evaluacion.tareas.forEach(tarea => {
+            // Evitar duplicados basándose en el título
+            const yaExiste = this.tareasPreviasMaterias[materiaKey].some(
+              t => t.titulo.toLowerCase() === tarea.titulo.toLowerCase()
+            );
+            
+            if (!yaExiste && tarea.titulo && tarea.titulo.trim()) {
+              this.tareasPreviasMaterias[materiaKey].push({
+                titulo: tarea.titulo,
+                descripcion: tarea.descripcion || ''
+              });
+            }
+          });
+        }
+      }
+    });
+    
+    this.materiasDisponibles = Array.from(materiasSet).sort();
   }
 
   async guardarEvaluacion(promedio: number, resultadoTexto: string) {
     if (!this.usuarioActual) return;
 
+    // Verificar si ya existe una evaluación de la misma materia y tipo
+    const evaluacionExistente = this.historial.find(evaluacion => 
+      evaluacion.materia.toLowerCase().trim() === this.materia.toLowerCase().trim() &&
+      evaluacion.tipo === this.tipo &&
+      evaluacion.usuarioId === this.usuarioActual!.id
+    );
+
+    if (evaluacionExistente && !this.modoEdicion) {
+      // Mostrar confirmación para actualizar o crear nueva
+      const actualizar = confirm(
+        `Ya existe una evaluación de "${this.materia}" del tipo "${this.getTipoDisplay(this.tipo)}".\n\n` +
+        `¿Deseas actualizar la evaluación existente agregando estas nuevas tareas?\n\n` +
+        `• Sí: Las nuevas tareas se agregarán a la evaluación existente\n` +
+        `• No: Se creará una nueva evaluación separada`
+      );
+
+      if (actualizar) {
+        await this.actualizarEvaluacionExistente(evaluacionExistente, promedio, resultadoTexto);
+        return;
+      }
+    }
+
+    // Crear nueva evaluación (comportamiento original)
     const evaluacion = new EvaluacionHistorial();
     evaluacion.usuarioId = this.usuarioActual.id;
     evaluacion.fecha = new Date();
@@ -103,6 +175,83 @@ export class HomeComponent implements OnInit, OnDestroy {
       this.cargarHistorial(); // Recargar el historial
     } catch (error) {
       console.error('Error al guardar la evaluación:', error);
+    }
+  }
+
+  private async actualizarEvaluacionExistente(evaluacionExistente: EvaluacionHistorial, promedio: number, resultadoTexto: string) {
+    try {
+      // Crear copias de las tareas y exámenes existentes
+      let tareasActualizadas = [...(evaluacionExistente.tareas || [])];
+      let examenesActualizados = [...(evaluacionExistente.examenes || [])];
+
+      // Agregar nuevas tareas
+      if (this.tipo === 'tareas' || this.tipo === 'tareas_examen') {
+        const nuevasTareas = this.calificaciones.map((cal, i) => ({
+          titulo: this.titulosTareas[i] || `Tarea ${tareasActualizadas.length + i + 1}`,
+          fecha: this.fechasTareas[i] || '',
+          descripcion: this.descripcionesTareas[i] || '',
+          calificacion: cal || 0
+        })).filter(tarea => tarea.calificacion > 0);
+
+        tareasActualizadas = [...tareasActualizadas, ...nuevasTareas];
+      }
+
+      // Agregar nuevos exámenes
+      if (this.tipo === 'tareas_examen' || this.tipo === 'examen') {
+        const nuevosExamenes = this.calExamenes.filter((ex): ex is number => ex != null && ex > 0);
+        examenesActualizados = [...examenesActualizados, ...nuevosExamenes];
+      }
+
+      // Recalcular el promedio con todas las tareas y exámenes
+      let nuevoPromedio = 0;
+      if (this.tipo === 'tareas') {
+        if (tareasActualizadas.length > 0) {
+          nuevoPromedio = tareasActualizadas.reduce((sum, tarea) => sum + tarea.calificacion, 0) / tareasActualizadas.length;
+        }
+      } else if (this.tipo === 'tareas_examen') {
+        if (tareasActualizadas.length > 0 && examenesActualizados.length > 0) {
+          const promedioTareas = tareasActualizadas.reduce((sum, tarea) => sum + tarea.calificacion, 0) / tareasActualizadas.length;
+          const promedioExamenes = examenesActualizados.reduce((sum, ex) => sum + ex, 0) / examenesActualizados.length;
+          nuevoPromedio = promedioTareas * this.ponderacionTareas + promedioExamenes * (1 - this.ponderacionTareas);
+        } else if (examenesActualizados.length > 0) {
+          nuevoPromedio = examenesActualizados.reduce((sum, ex) => sum + ex, 0) / examenesActualizados.length;
+        } else if (tareasActualizadas.length > 0) {
+          nuevoPromedio = tareasActualizadas.reduce((sum, tarea) => sum + tarea.calificacion, 0) / tareasActualizadas.length;
+        }
+      } else if (this.tipo === 'examen') {
+        if (examenesActualizados.length > 0) {
+          nuevoPromedio = examenesActualizados.reduce((sum, ex) => sum + ex, 0) / examenesActualizados.length;
+        }
+      }
+
+      // Generar nuevo texto de resultado
+      const nuevoResultadoTexto = nuevoPromedio >= 6 
+        ? `¡Felicidades ${this.nombre}! Estás aprobando con promedio ${nuevoPromedio.toFixed(2)}.`
+        : `Lo siento ${this.nombre}, estás reprobando con promedio ${nuevoPromedio.toFixed(2)}.`;
+
+      // Actualizar la evaluación existente
+      const datosActualizados: any = {
+        tareas: tareasActualizadas,
+        examenes: examenesActualizados,
+        promedio: nuevoPromedio,
+        resultado: nuevoResultadoTexto,
+        fecha: new Date() // Actualizar la fecha también
+      };
+
+      // Actualizar ponderación si corresponde
+      if (this.tipo === 'tareas_examen') {
+        datosActualizados.ponderacionTareas = this.ponderacionTareas;
+      }
+
+      const docRef = doc(this.firestore, 'evaluaciones', evaluacionExistente.id!);
+      await updateDoc(docRef, datosActualizados);
+      
+      this.cargarHistorial();
+      alert(`Evaluación de "${this.materia}" actualizada exitosamente.\nNuevo promedio: ${nuevoPromedio.toFixed(2)}`);
+      
+    } catch (error) {
+      console.error('Error al actualizar la evaluación existente:', error);
+      alert('Error al actualizar la evaluación existente');
     }
   }
   nombre = '';
@@ -626,6 +775,11 @@ export class HomeComponent implements OnInit, OnDestroy {
       this.ponderacionTareas = evaluacion.ponderacionTareas;
     }
     
+    // Limpiar variables de autocompletado cuando se edita
+    this.mostrarSugerenciasMaterias = false;
+    this.mostrarTareasPrevias = false;
+    this.evaluacionExistenteInfo = null;
+    
     // Scroll al formulario
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -727,5 +881,126 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.mostrarResultado = false;
     this.resultadoTexto = '';
     this.resultadoClase = '';
+    
+    // Limpiar variables de autocompletado
+    this.mostrarSugerenciasMaterias = false;
+    this.mostrarTareasPrevias = false;
+    this.materiasFiltradas = [];
+    this.tareasPreviasDisponibles = [];
+    this.evaluacionExistenteInfo = null;
+  }
+
+  // Función helper para obtener un resumen de las tareas
+  getTareasResumen(evaluacion: EvaluacionHistorial): string {
+    if (!evaluacion.tareas || evaluacion.tareas.length === 0) {
+      return 'Sin tareas registradas';
+    }
+    
+    const resumen = evaluacion.tareas.map(tarea => 
+      `${tarea.titulo || 'Sin título'}: ${tarea.calificacion}`
+    ).join(' | ');
+    
+    return resumen.length > 50 ? resumen.substring(0, 50) + '...' : resumen;
+  }
+
+  // Función helper para obtener un resumen de los exámenes
+  getExamenesResumen(evaluacion: EvaluacionHistorial): string {
+    if (!evaluacion.examenes || evaluacion.examenes.length === 0) {
+      return 'Sin exámenes registrados';
+    }
+    
+    return evaluacion.examenes.map((examen, index) => 
+      `Examen ${index + 1}: ${examen}`
+    ).join(' | ');
+  }
+
+  // Métodos para autocompletado de materias
+  onMateriaInput(event: any) {
+    const valor = event.target.value;
+    this.materia = valor;
+    
+    if (valor && valor.length > 0) {
+      this.materiasFiltradas = this.materiasDisponibles.filter(m => 
+        m.toLowerCase().includes(valor.toLowerCase())
+      );
+      this.mostrarSugerenciasMaterias = this.materiasFiltradas.length > 0;
+    } else {
+      this.mostrarSugerenciasMaterias = false;
+    }
+  }
+
+  seleccionarMateria(materia: string) {
+    this.materia = materia;
+    this.mostrarSugerenciasMaterias = false;
+    
+    // Cargar tareas previas de esta materia
+    this.cargarTareasPrevias(materia);
+  }
+
+  private cargarTareasPrevias(materia: string) {
+    const materiaKey = materia.toLowerCase().trim();
+    const tareasPrevias = this.tareasPreviasMaterias[materiaKey] || [];
+    
+    // Buscar evaluación existente de la misma materia y tipo
+    this.evaluacionExistenteInfo = this.historial.find(evaluacion => 
+      evaluacion.materia.toLowerCase().trim() === materiaKey &&
+      evaluacion.tipo === this.tipo &&
+      evaluacion.usuarioId === this.usuarioActual!.id
+    ) || null;
+    
+    if (tareasPrevias.length > 0) {
+      // Mostrar las tareas previas como sugerencias para que el usuario pueda elegir
+      this.mostrarTareasPrevias = true;
+      this.tareasPreviasDisponibles = tareasPrevias;
+    } else {
+      this.mostrarTareasPrevias = false;
+      this.tareasPreviasDisponibles = [];
+    }
+  }
+
+  // Variables para mostrar tareas previas
+  mostrarTareasPrevias = false;
+  tareasPreviasDisponibles: Array<{titulo: string, descripcion: string}> = [];
+
+  agregarTareaPreviaAlFormulario(tareaPrev: {titulo: string, descripcion: string}) {
+    // Buscar el primer campo de tarea vacío o agregar uno nuevo
+    let indiceVacio = this.titulosTareas.findIndex(titulo => !titulo || titulo.trim() === '');
+    
+    if (indiceVacio === -1) {
+      // No hay campos vacíos, agregar uno nuevo
+      this.agregarCalificacion();
+      indiceVacio = this.titulosTareas.length - 1;
+    }
+    
+    // Llenar los datos de la tarea
+    this.titulosTareas[indiceVacio] = tareaPrev.titulo;
+    this.descripcionesTareas[indiceVacio] = tareaPrev.descripcion;
+    
+    // Enfocar el campo de calificación
+    setTimeout(() => {
+      const calInput = document.querySelector(`input[name="cal${indiceVacio}"]`) as HTMLInputElement;
+      if (calInput) {
+        calInput.focus();
+      }
+    }, 100);
+  }
+
+  ocultarSugerenciasMaterias() {
+    // Pequeño delay para permitir que el click en la sugerencia se procese
+    setTimeout(() => {
+      this.mostrarSugerenciasMaterias = false;
+    }, 200);
+  }
+
+  ocultarTareasPrevias() {
+    this.mostrarTareasPrevias = false;
+  }
+
+  // Método que se llama cuando cambia el tipo de evaluación
+  onTipoChange() {
+    // Recargar tareas previas y verificar evaluaciones existentes si hay una materia seleccionada
+    if (this.materia && this.materia.trim()) {
+      this.cargarTareasPrevias(this.materia);
+    }
   }
 }

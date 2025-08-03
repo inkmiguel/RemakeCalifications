@@ -45,16 +45,71 @@
 
       <div class="mb-3">
         <label for="materia" class="form-label">Materia</label>
-        <input type="text" id="materia" class="form-control" [(ngModel)]="materia" name="materia">
+        <div class="position-relative">
+          <input type="text" id="materia" class="form-control" 
+                 [(ngModel)]="materia" name="materia"
+                 (input)="onMateriaInput($event)"
+                 (blur)="ocultarSugerenciasMaterias()"
+                 placeholder="Escribe el nombre de la materia..."
+                 autocomplete="off">
+          
+          <!-- Dropdown de sugerencias de materias -->
+          <div class="dropdown-menu show position-absolute w-100" 
+               *ngIf="mostrarSugerenciasMaterias && materiasFiltradas.length > 0"
+               style="z-index: 1050; max-height: 200px; overflow-y: auto;">
+            <button class="dropdown-item" 
+                    *ngFor="let materiaSug of materiasFiltradas"
+                    (click)="seleccionarMateria(materiaSug)">
+              {{ materiaSug }}
+            </button>
+          </div>
+        </div>
+        
+        <!-- Tareas previas de la materia seleccionada -->
+        <div *ngIf="mostrarTareasPrevias && tareasPreviasDisponibles.length > 0" class="mt-2">
+          <div class="alert alert-info">
+            <h6 class="mb-2">
+              <i class="bi bi-lightbulb me-1"></i>
+              Tareas previas de "{{ materia }}":
+            </h6>
+            <div class="d-flex flex-wrap gap-1">
+              <button class="btn btn-sm btn-outline-primary" 
+                      *ngFor="let tareaPrev of tareasPreviasDisponibles"
+                      (click)="agregarTareaPreviaAlFormulario(tareaPrev)"
+                      title="Click para agregar esta tarea al formulario">
+                <i class="bi bi-plus-circle me-1"></i>{{ tareaPrev.titulo }}
+              </button>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary mt-2" 
+                    (click)="ocultarTareasPrevias()">
+              Ocultar sugerencias
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="mb-3">
         <label for="tipo" class="form-label">Tipo de evaluación</label>
-        <select id="tipo" class="form-select" [(ngModel)]="tipo" name="tipo">
+        <select id="tipo" class="form-select" [(ngModel)]="tipo" name="tipo" (change)="onTipoChange()">
           <option value="tareas" selected>Solo tareas</option>
           <option value="tareas_examen">Tareas + Examen</option>
           <option value="examen">Solo examen</option>
         </select>
+        
+        <!-- Alerta de evaluación existente -->
+        <div *ngIf="evaluacionExistenteInfo && !modoEdicion" class="alert alert-warning mt-2">
+          <div class="d-flex align-items-center">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <div class="flex-grow-1">
+              <strong>¡Evaluación existente encontrada!</strong><br>
+              <small>
+                Ya tienes una evaluación de "{{ evaluacionExistenteInfo.materia }}" ({{ getTipoDisplay(evaluacionExistenteInfo.tipo) }}) 
+                con promedio <span [ngClass]="getPromedioClass(evaluacionExistenteInfo.promedio)">{{ evaluacionExistenteInfo.promedio.toFixed(2) }}</span>.
+                <br>Al evaluar, se te preguntará si quieres actualizar la existente o crear una nueva.
+              </small>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Campo de ponderación solo para tareas + examen -->
@@ -176,42 +231,118 @@
           <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">Historial de Evaluaciones</h5>
           </div>
-          <table class="table table-sm table-striped mb-0">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th *ngIf="usuarioActual?.tipoUsuario==='profesor'">Alumno</th>
-                <th>Materia</th>
-                <th>Tipo</th>
-                <th>Promedio</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let item of historial">
-                <td>{{ item.fecha | date:'short' }}</td>
-                <td *ngIf="usuarioActual?.tipoUsuario==='profesor'">{{ item.nombre }}</td>
-                <td>{{ item.materia }}</td>
-                <td>{{ getTipoDisplay(item.tipo) }}</td>
-                <td>
-                  <span [ngClass]="getPromedioClass(item.promedio)">
-                    {{ item.promedio.toFixed(2) }}
-                  </span>
-                </td>
-                <td>
-                  <button class="btn btn-sm btn-primary me-1" (click)="editarEvaluacion(item)">
-                    <i class="bi bi-pencil"></i> Editar
-                  </button>
-                  <button class="btn btn-sm btn-danger" (click)="eliminarEvaluacion(item.id)">
-                    <i class="bi bi-trash"></i> Eliminar
-                  </button>
-                </td>
-              </tr>
-              <tr *ngIf="!historial || historial.length === 0">
-                <td [attr.colspan]="usuarioActual?.tipoUsuario==='profesor' ? 6 : 5" class="text-center text-muted">Sin registros</td>
-              </tr>
-            </tbody>
-          </table>
+          
+          <!-- Historial detallado con acordeón -->
+          <div class="accordion" id="historialAccordion" *ngIf="historial && historial.length > 0">
+            <div class="accordion-item" *ngFor="let item of historial; let i = index">
+              <h2 class="accordion-header" [id]="'heading' + i">
+                <button class="accordion-button collapsed" type="button" 
+                        data-bs-toggle="collapse" 
+                        [attr.data-bs-target]="'#collapse' + i" 
+                        [attr.aria-expanded]="false" 
+                        [attr.aria-controls]="'collapse' + i">
+                  <div class="w-100">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div>
+                        <strong>{{ item.materia }}</strong>
+                        <span *ngIf="usuarioActual?.tipoUsuario==='profesor'"> - {{ item.nombre }}</span>
+                        <br>
+                        <small class="text-muted">
+                          {{ item.fecha | date:'short' }} | {{ getTipoDisplay(item.tipo) }}
+                        </small>
+                      </div>
+                      <div class="text-end">
+                        <span [ngClass]="getPromedioClass(item.promedio)" class="fs-5">
+                          {{ item.promedio.toFixed(2) }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              </h2>
+              <div [id]="'collapse' + i" class="accordion-collapse collapse" 
+                   [attr.aria-labelledby]="'heading' + i" 
+                   data-bs-parent="#historialAccordion">
+                <div class="accordion-body">
+                  <!-- Detalles de tareas -->
+                  <div *ngIf="item.tareas && item.tareas.length > 0" class="mb-3">
+                    <h6 class="text-primary mb-2">
+                      <i class="bi bi-clipboard-check me-1"></i>Tareas:
+                    </h6>
+                    <div class="row">
+                      <div class="col-md-6" *ngFor="let tarea of item.tareas">
+                        <div class="card card-sm mb-2">
+                          <div class="card-body p-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                              <div class="flex-grow-1">
+                                <h6 class="card-title mb-1 text-truncate">{{ tarea.titulo || 'Sin título' }}</h6>
+                                <small class="text-muted" *ngIf="tarea.fecha">
+                                  <i class="bi bi-calendar3 me-1"></i>{{ tarea.fecha }}
+                                </small>
+                                <p class="card-text small mb-0" *ngIf="tarea.descripcion">{{ tarea.descripcion }}</p>
+                              </div>
+                              <div class="text-end ms-2">
+                                <span class="badge bg-primary fs-6">{{ tarea.calificacion }}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Detalles de exámenes -->
+                  <div *ngIf="item.examenes && item.examenes.length > 0" class="mb-3">
+                    <h6 class="text-warning mb-2">
+                      <i class="bi bi-file-earmark-text me-1"></i>Exámenes:
+                    </h6>
+                    <div class="d-flex flex-wrap gap-2">
+                      <span class="badge bg-warning text-dark fs-6" *ngFor="let examen of item.examenes; let j = index">
+                        Examen {{ j + 1 }}: {{ examen }}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <!-- Ponderación para tipo mixto -->
+                  <div *ngIf="item.tipo === 'tareas_examen' && item.ponderacionTareas !== undefined" class="mb-3">
+                    <h6 class="text-info mb-1">
+                      <i class="bi bi-bar-chart me-1"></i>Ponderación:
+                    </h6>
+                    <small class="text-muted">
+                      Tareas: {{ (item.ponderacionTareas * 100).toFixed(0) }}% | 
+                      Exámenes: {{ ((1 - item.ponderacionTareas) * 100).toFixed(0) }}%
+                    </small>
+                  </div>
+                  
+                  <!-- Resultado final -->
+                  <div class="border-top pt-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <span class="text-muted">Resultado:</span>
+                      <span [ngClass]="getPromedioClass(item.promedio)">
+                        <strong>{{ item.resultado }}</strong>
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <!-- Botones de acción -->
+                  <div class="d-flex gap-2 mt-3">
+                    <button class="btn btn-sm btn-outline-primary" (click)="editarEvaluacion(item)">
+                      <i class="bi bi-pencil me-1"></i>Editar
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" (click)="eliminarEvaluacion(item.id)">
+                      <i class="bi bi-trash me-1"></i>Eliminar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Mensaje cuando no hay historial -->
+          <div class="alert alert-info text-center mb-0" *ngIf="!historial || historial.length === 0">
+            <i class="bi bi-info-circle me-2"></i>
+            No hay evaluaciones registradas aún.
+          </div>
         </ng-container>
         <ng-template #noLoginMsg>
           <div class="alert alert-info text-center mb-0 login-prompt" 
