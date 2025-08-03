@@ -125,7 +125,11 @@
       <!-- Tareas dinámicas -->
       <div class="mb-3" *ngIf="tipo === 'tareas' || tipo === 'tareas_examen'">
         <label class="form-label">Tareas</label>
-        <div class="form-text mb-2">Tilin inzano potaxie digital fortnite el campo de califiacion y darle Enter para generar el siguiente. Campos vacíos no se consideran en el cálculo.</div>
+        <div class="form-text mb-2">
+          Completa el campo de calificación y presiona Enter para generar la siguiente tarea. 
+          <strong>Cada tarea puede tener su propia ponderación individual</strong> (peso en el promedio final). 
+          Las ponderaciones se normalizarán automáticamente. Campos vacíos no se consideran en el cálculo.
+        </div>
 
         <div *ngFor="let cal of calificaciones; let i = index; trackBy: trackByIndex" class="card mb-3">
           <div class="card-header">
@@ -157,6 +161,14 @@
                           [disabled]="!calificacionesHabilitadas"></textarea>
               </div>
               <div class="col-md-6">
+                <label for="ponderacion{{i}}" class="form-label">Ponderación</label>
+                <input type="number" class="form-control" [(ngModel)]="ponderacionesTareas[i]" 
+                       name="ponderacion{{i}}" min="0" max="1" step="0.01"
+                       [disabled]="!calificacionesHabilitadas"
+                       placeholder="Ej: 0.3 (30%)">
+                <div class="form-text">Peso de esta tarea en el promedio final</div>
+              </div>
+              <div class="col-md-6">
                 <label class="form-label">Calificación</label>
                 <input type="number" class="form-control" 
                        #calInput{{i}}
@@ -169,6 +181,26 @@
               </div>
             </div>
           </div>
+        </div>
+        
+        <!-- Resumen de ponderaciones -->
+        <div class="alert alert-info mt-2" *ngIf="ponderacionesTareas.length > 0">
+          <div class="d-flex justify-content-between align-items-center">
+            <small>
+              <i class="bi bi-info-circle me-1"></i>
+              <strong>Suma total de ponderaciones:</strong> 
+              {{ getSumaPonderaciones().toFixed(2) }}
+            </small>
+            <button class="btn btn-sm btn-outline-primary" 
+                    type="button" 
+                    (click)="normalizarPonderaciones()"
+                    [disabled]="!calificacionesHabilitadas">
+              <i class="bi bi-arrow-clockwise me-1"></i>Normalizar
+            </button>
+          </div>
+          <small class="text-muted">
+            Las ponderaciones se normalizarán automáticamente al evaluar para que sumen 1.0 (100%)
+          </small>
         </div>
       </div>
 
@@ -214,7 +246,7 @@
 
     <!-- Lado Derecho: Gráfica y Historial -->
     <div class="col-md-6">
-      <h4>Gráfica / Observaciones</h4>
+      <h4>Historial de Promedios</h4>
       <div class="border rounded p-3 bg-light mb-4" style="min-height: 320px; max-width: 100%; display: flex; align-items: center; justify-content: center;">
         <canvas baseChart
                 [data]="barChartData"
@@ -223,6 +255,19 @@
                 [type]="barChartType"
                 style="max-height: 250px; width: 100%;">
         </canvas>
+      </div>
+      
+      <!-- Leyenda de la gráfica -->
+      <div class="alert alert-info mb-4" *ngIf="usuarioLogueado">
+        <div class="d-flex align-items-center">
+          <i class="bi bi-info-circle me-2"></i>
+          <small>
+            <strong>Leyenda:</strong> 
+            <span class="badge bg-primary me-1">Azul</span> Solo tareas, 
+            <span class="badge bg-warning text-dark me-1">Amarillo</span> Tareas + Examen, 
+            <span class="badge bg-danger me-1">Rojo</span> Solo examen
+          </small>
+        </div>
       </div>
 
       <!-- Tabla de historial de evaluaciones solo si usuario está logueado -->
@@ -283,6 +328,9 @@
                               </div>
                               <div class="text-end ms-2">
                                 <span class="badge bg-primary fs-6">{{ tarea.calificacion }}</span>
+                                <small class="text-muted d-block" *ngIf="tarea.ponderacion">
+                                  Peso: {{ (tarea.ponderacion * 100).toFixed(1) }}%
+                                </small>
                               </div>
                             </div>
                           </div>

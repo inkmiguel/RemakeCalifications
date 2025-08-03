@@ -46,6 +46,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.cargarHistorial();
       } else {
         this.historial = [];
+        this.mostrarGraficaSinLogin();
       }
     });
   }
@@ -74,7 +75,70 @@ export class HomeComponent implements OnInit, OnDestroy {
       
       // Extraer materias únicas para autocompletado
       this.extraerMateriasYTareas();
+      
+      // Actualizar la gráfica con el historial global
+      this.actualizarGraficaGlobal();
     });
+  }
+
+  private actualizarGraficaGlobal() {
+    const labels: string[] = [];
+    const datos: number[] = [];
+    const colores: string[] = [];
+
+    // Colores para diferentes tipos de evaluación
+    const coloresTipo = {
+      'tareas': 'rgba(54, 162, 235, 0.7)',        // Azul
+      'tareas_examen': 'rgba(255, 206, 86, 0.7)', // Amarillo
+      'examen': 'rgba(255, 99, 132, 0.7)'         // Rojo
+    };
+
+    // Agregar promedios de las evaluaciones del historial (más recientes primero)
+    this.historial.forEach((evaluacion, index) => {
+      if (evaluacion.promedio !== undefined && evaluacion.promedio > 0) {
+        const fechaStr = evaluacion.fecha ? evaluacion.fecha.toLocaleDateString('es-ES') : '';
+        labels.push(`${evaluacion.materia} (${fechaStr})`);
+        datos.push(evaluacion.promedio);
+        colores.push(coloresTipo[evaluacion.tipo as keyof typeof coloresTipo] || 'rgba(75, 192, 192, 0.7)');
+      }
+    });
+
+    // Si no hay historial, mostrar mensaje en la gráfica
+    if (datos.length === 0) {
+      labels.push('Sin evaluaciones');
+      datos.push(0);
+      colores.push('rgba(200, 200, 200, 0.7)');
+    }
+
+    // Actualizar la gráfica
+    this.barChartData = {
+      labels: [...labels],
+      datasets: [
+        {
+          label: 'Promedio por Materia',
+          data: [...datos],
+          backgroundColor: colores,
+          borderColor: colores.map(color => color.replace('0.7', '1')),
+          borderWidth: 1
+        }
+      ]
+    };
+  }
+
+  private mostrarGraficaSinLogin() {
+    // Mostrar una gráfica informativa cuando no hay usuario logueado
+    this.barChartData = {
+      labels: ['Inicia sesión para ver tus evaluaciones'],
+      datasets: [
+        {
+          label: 'Estado',
+          data: [0],
+          backgroundColor: 'rgba(200, 200, 200, 0.7)',
+          borderColor: 'rgba(200, 200, 200, 1)',
+          borderWidth: 1
+        }
+      ]
+    };
   }
 
   private extraerMateriasYTareas() {
@@ -153,7 +217,8 @@ export class HomeComponent implements OnInit, OnDestroy {
         titulo: this.titulosTareas[i] || `Tarea ${i + 1}`,
         fecha: this.fechasTareas[i] || '',
         descripcion: this.descripcionesTareas[i] || '',
-        calificacion: cal || 0
+        calificacion: cal || 0,
+        ponderacion: this.ponderacionesTareas[i] || 0
       })).filter(tarea => tarea.calificacion > 0);
     }
     
@@ -190,7 +255,8 @@ export class HomeComponent implements OnInit, OnDestroy {
           titulo: this.titulosTareas[i] || `Tarea ${tareasActualizadas.length + i + 1}`,
           fecha: this.fechasTareas[i] || '',
           descripcion: this.descripcionesTareas[i] || '',
-          calificacion: cal || 0
+          calificacion: cal || 0,
+          ponderacion: this.ponderacionesTareas[i] || 0
         })).filter(tarea => tarea.calificacion > 0);
 
         tareasActualizadas = [...tareasActualizadas, ...nuevasTareas];
@@ -206,17 +272,17 @@ export class HomeComponent implements OnInit, OnDestroy {
       let nuevoPromedio = 0;
       if (this.tipo === 'tareas') {
         if (tareasActualizadas.length > 0) {
-          nuevoPromedio = tareasActualizadas.reduce((sum, tarea) => sum + tarea.calificacion, 0) / tareasActualizadas.length;
+          nuevoPromedio = this.calcularPromedioPonderadoDesdeTareas(tareasActualizadas);
         }
       } else if (this.tipo === 'tareas_examen') {
         if (tareasActualizadas.length > 0 && examenesActualizados.length > 0) {
-          const promedioTareas = tareasActualizadas.reduce((sum, tarea) => sum + tarea.calificacion, 0) / tareasActualizadas.length;
+          const promedioTareas = this.calcularPromedioPonderadoDesdeTareas(tareasActualizadas);
           const promedioExamenes = examenesActualizados.reduce((sum, ex) => sum + ex, 0) / examenesActualizados.length;
           nuevoPromedio = promedioTareas * this.ponderacionTareas + promedioExamenes * (1 - this.ponderacionTareas);
         } else if (examenesActualizados.length > 0) {
           nuevoPromedio = examenesActualizados.reduce((sum, ex) => sum + ex, 0) / examenesActualizados.length;
         } else if (tareasActualizadas.length > 0) {
-          nuevoPromedio = tareasActualizadas.reduce((sum, tarea) => sum + tarea.calificacion, 0) / tareasActualizadas.length;
+          nuevoPromedio = this.calcularPromedioPonderadoDesdeTareas(tareasActualizadas);
         }
       } else if (this.tipo === 'examen') {
         if (examenesActualizados.length > 0) {
@@ -265,6 +331,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   titulosTareas: string[] = [''];
   fechasTareas: string[] = [''];
   descripcionesTareas: string[] = [''];
+  ponderacionesTareas: number[] = [1.0]; // Ponderación individual de cada tarea
 
   mostrarResultado = false;
   resultadoTexto = '';
@@ -278,25 +345,49 @@ export class HomeComponent implements OnInit, OnDestroy {
         callbacks: {
           title: (context) => {
             const index = context[0].dataIndex;
-            // Obtener el número de tareas válidas para determinar si es tarea o examen
-            const tareasValidas = this.calificaciones.filter((cal): cal is number => cal != null && cal > 0);
-            
-            if (index < tareasValidas.length) {
-              // Es una tarea
-              const tareaIndex = this.calificaciones.findIndex((cal, i) => {
-                const validasAntes = this.calificaciones.slice(0, i).filter((c): c is number => c != null && c > 0).length;
-                return cal != null && cal > 0 && validasAntes === index;
-              });
-              return this.titulosTareas[tareaIndex] || `Tarea ${index + 1}`;
-            } else {
-              // Es un examen
-              const examenIndex = index - tareasValidas.length;
-              return `Examen ${examenIndex + 1}`;
+            if (this.historial && this.historial[index]) {
+              const evaluacion = this.historial[index];
+              return `${evaluacion.materia} - ${this.getTipoDisplay(evaluacion.tipo)}`;
             }
+            return context[0].label || '';
           },
           label: (context) => {
-            return `Calificación: ${context.parsed.y}`;
+            const index = context.dataIndex;
+            if (this.historial && this.historial[index]) {
+              const evaluacion = this.historial[index];
+              const promedio = context.parsed.y;
+              const estado = promedio >= 6 ? 'Aprobado' : 'Reprobado';
+              return [
+                `Promedio: ${promedio.toFixed(2)}`,
+                `Estado: ${estado}`,
+                `Fecha: ${evaluacion.fecha ? evaluacion.fecha.toLocaleDateString('es-ES') : 'N/A'}`
+              ];
+            }
+            return `Promedio: ${context.parsed.y}`;
           }
+        }
+      },
+      legend: {
+        display: true,
+        position: 'top'
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        max: 10,
+        ticks: {
+          stepSize: 1
+        },
+        title: {
+          display: true,
+          text: 'Calificación'
+        }
+      },
+      x: {
+        title: {
+          display: true,
+          text: 'Evaluaciones'
         }
       }
     }
@@ -327,6 +418,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.titulosTareas.push('');
     this.fechasTareas.push('');
     this.descripcionesTareas.push('');
+    this.ponderacionesTareas.push(0.1); // Valor por defecto para nueva tarea
     
     // Forzar la detección de cambios para que los nuevos campos aparezcan en blanco
     setTimeout(() => {
@@ -360,6 +452,103 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   }
 
+  // Método para normalizar las ponderaciones para que sumen 1.0
+  normalizarPonderaciones(): void {
+    const suma = this.ponderacionesTareas.reduce((sum, pond) => sum + (pond || 0), 0);
+    if (suma > 0) {
+      for (let i = 0; i < this.ponderacionesTareas.length; i++) {
+        this.ponderacionesTareas[i] = (this.ponderacionesTareas[i] || 0) / suma;
+      }
+    } else {
+      // Si todas las ponderaciones son 0, distribuir equitativamente
+      const valorEquitativo = 1.0 / this.ponderacionesTareas.length;
+      for (let i = 0; i < this.ponderacionesTareas.length; i++) {
+        this.ponderacionesTareas[i] = valorEquitativo;
+      }
+    }
+  }
+
+  // Método para calcular el promedio ponderado de las tareas
+  calcularPromedioPonderadoTareas(): number {
+    const calificacionesValidas: number[] = [];
+    const ponderacionesValidas: number[] = [];
+    
+    for (let i = 0; i < this.calificaciones.length; i++) {
+      const cal = this.calificaciones[i];
+      const pond = this.ponderacionesTareas[i];
+      if (cal != null && cal > 0 && pond != null && pond > 0) {
+        calificacionesValidas.push(cal);
+        ponderacionesValidas.push(pond);
+      }
+    }
+    
+    if (calificacionesValidas.length === 0) {
+      return 0;
+    }
+    
+    // Normalizar las ponderaciones válidas para que sumen 1.0
+    const sumaPonderaciones = ponderacionesValidas.reduce((sum, pond) => sum + pond, 0);
+    if (sumaPonderaciones === 0) {
+      // Si no hay ponderaciones válidas, usar promedio simple
+      return calificacionesValidas.reduce((sum, cal) => sum + cal, 0) / calificacionesValidas.length;
+    }
+    
+    // Calcular promedio ponderado
+    let sumaProductos = 0;
+    for (let i = 0; i < calificacionesValidas.length; i++) {
+      sumaProductos += calificacionesValidas[i] * (ponderacionesValidas[i] / sumaPonderaciones);
+    }
+    
+    return sumaProductos;
+  }
+
+  // Método para validar que las ponderaciones sean válidas
+  validarPonderaciones(): boolean {
+    const suma = this.ponderacionesTareas.reduce((sum, pond) => sum + (pond || 0), 0);
+    return suma > 0; // Al menos debe haber alguna ponderación mayor a 0
+  }
+
+  // Método para obtener la suma de ponderaciones (usado en el template)
+  getSumaPonderaciones(): number {
+    return this.ponderacionesTareas.reduce((sum, pond) => sum + (pond || 0), 0);
+  }
+
+  // Método para calcular promedio ponderado desde array de tareas guardadas
+  calcularPromedioPonderadoDesdeTareas(tareas: Array<{titulo: string; fecha: string; descripcion: string; calificacion: number; ponderacion?: number}>): number {
+    if (!tareas || tareas.length === 0) {
+      return 0;
+    }
+
+    // Verificar si todas las tareas tienen ponderación
+    const todasTienenPonderacion = tareas.every(tarea => tarea.ponderacion !== undefined && tarea.ponderacion > 0);
+    
+    if (!todasTienenPonderacion) {
+      // Si no todas tienen ponderación, usar promedio simple
+      return tareas.reduce((sum, tarea) => sum + tarea.calificacion, 0) / tareas.length;
+    }
+
+    const tareasValidas = tareas.filter(tarea => tarea.calificacion > 0 && tarea.ponderacion! > 0);
+    
+    if (tareasValidas.length === 0) {
+      return tareas.reduce((sum, tarea) => sum + tarea.calificacion, 0) / tareas.length;
+    }
+
+    // Normalizar las ponderaciones para que sumen 1.0
+    const sumaPonderaciones = tareasValidas.reduce((sum, tarea) => sum + tarea.ponderacion!, 0);
+    
+    if (sumaPonderaciones === 0) {
+      return tareasValidas.reduce((sum, tarea) => sum + tarea.calificacion, 0) / tareasValidas.length;
+    }
+
+    // Calcular promedio ponderado
+    let sumaProductos = 0;
+    for (const tarea of tareasValidas) {
+      sumaProductos += tarea.calificacion * (tarea.ponderacion! / sumaPonderaciones);
+    }
+
+    return sumaProductos;
+  }
+
   eliminarCalificacion(index: number): void {
     // No permitir eliminar si solo queda una calificación
     if (this.calificaciones.length > 1) {
@@ -367,6 +556,9 @@ export class HomeComponent implements OnInit, OnDestroy {
       this.titulosTareas.splice(index, 1);
       this.fechasTareas.splice(index, 1);
       this.descripcionesTareas.splice(index, 1);
+      this.ponderacionesTareas.splice(index, 1);
+      // Renormalizar las ponderaciones restantes
+      this.normalizarPonderaciones();
     }
   }
 
@@ -613,42 +805,22 @@ export class HomeComponent implements OnInit, OnDestroy {
     const calificacionesValidas = this.calificaciones.filter((cal): cal is number => cal != null && cal > 0);
     const examenesValidos = this.calExamenes.filter((ex): ex is number => ex != null && ex > 0);
 
-    // Crear etiquetas solo para las calificaciones válidas
-    this.barChartLabels = [
-      ...calificacionesValidas.map((_, i) => `Tarea ${i + 1}`),
-      ...examenesValidos.map((_, i) => `Examen ${i + 1}`)
-    ];
-
-    // Preparar datos para la gráfica solo con calificaciones válidas
-    let datosGrafica: number[] = [...calificacionesValidas, ...examenesValidos];
-
-    // Actualizar barChartData creando un nuevo objeto para detectar cambios
-    this.barChartData = {
-      labels: [...this.barChartLabels],
-      datasets: [
-        {
-          label: 'Calificaciones',
-          data: [...datosGrafica],
-          backgroundColor: 'rgba(54, 162, 235, 0.7)',
-        }
-      ]
-    };
-
-    // Cálculo del promedio ponderado simple
+    // Cálculo del promedio ponderado
     let promedio = 0;
     if (this.tipo === 'tareas') {
       if (calificacionesValidas.length > 0) {
-        promedio = calificacionesValidas.reduce((a, b) => a + b, 0) / calificacionesValidas.length;
+        // Usar el nuevo método de promedio ponderado para tareas
+        promedio = this.calcularPromedioPonderadoTareas();
       }
     } else if (this.tipo === 'tareas_examen') {
       if (calificacionesValidas.length > 0 && examenesValidos.length > 0) {
-        let tareas = calificacionesValidas.reduce((a, b) => a + b, 0) / calificacionesValidas.length;
+        let tareas = this.calcularPromedioPonderadoTareas(); // Usar promedio ponderado
         let examen = examenesValidos.reduce((a, b) => a + b, 0) / examenesValidos.length;
         promedio = tareas * this.ponderacionTareas + examen * (1 - this.ponderacionTareas);
       } else if (examenesValidos.length > 0) {
         promedio = examenesValidos.reduce((a, b) => a + b, 0) / examenesValidos.length;
       } else if (calificacionesValidas.length > 0) {
-        promedio = calificacionesValidas.reduce((a, b) => a + b, 0) / calificacionesValidas.length;
+        promedio = this.calcularPromedioPonderadoTareas(); // Usar promedio ponderado
       }
     } else if (this.tipo === 'examen') {
       if (examenesValidos.length > 0) {
@@ -744,6 +916,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.titulosTareas = [];
     this.fechasTareas = [];
     this.descripcionesTareas = [];
+    this.ponderacionesTareas = [];
     this.calExamenes = [];
     
     // Cargar tareas si existen
@@ -753,6 +926,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.titulosTareas.push(tarea.titulo || '');
         this.fechasTareas.push(tarea.fecha || '');
         this.descripcionesTareas.push(tarea.descripcion || '');
+        this.ponderacionesTareas.push(tarea.ponderacion || 0.1);
       });
     } else {
       // Asegurar al menos un campo vacío
@@ -760,6 +934,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       this.titulosTareas.push('');
       this.fechasTareas.push('');
       this.descripcionesTareas.push('');
+      this.ponderacionesTareas.push(1.0);
     }
     
     // Cargar exámenes si existen
@@ -859,7 +1034,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       await updateDoc(docRef, datosActualizados);
       
       this.cancelarEdicion();
-      this.cargarHistorial();
+      this.cargarHistorial(); // Esto actualizará automáticamente la gráfica
       
       alert('Evaluación actualizada correctamente');
     } catch (error) {
@@ -878,6 +1053,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.titulosTareas = [''];
     this.fechasTareas = [''];
     this.descripcionesTareas = [''];
+    this.ponderacionesTareas = [1.0];
     this.mostrarResultado = false;
     this.resultadoTexto = '';
     this.resultadoClase = '';

@@ -12,6 +12,7 @@ export class EvaluacionHistorial {
         fecha: string;
         descripcion: string;
         calificacion: number;
+        ponderacion?: number;
     }> = [];
     examenes?: number[] = [];
     ponderacionTareas?: number;
