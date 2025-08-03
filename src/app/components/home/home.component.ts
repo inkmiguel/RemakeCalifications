@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { ChartOptions, ChartData, ChartType } from 'chart.js';
 import { AuthService } from '../../services/auth.service';
 import { Usuario, EvaluacionHistorial } from '../DB';
-import { Firestore, collection, addDoc, query, where, collectionData, orderBy } from '@angular/fire/firestore';
+import { Firestore, collection, addDoc, query, where, collectionData, orderBy, doc, deleteDoc, updateDoc } from '@angular/fire/firestore';
 import { Subscription } from 'rxjs';
 
 @Component({
@@ -16,6 +16,10 @@ export class HomeComponent implements OnInit, OnDestroy {
   usuarioActual: Usuario | null = null;
   private authSubscription?: Subscription;
   historial: EvaluacionHistorial[] = [];
+  
+  // Variables para edición
+  modoEdicion = false;
+  evaluacionEditando: EvaluacionHistorial | null = null;
 
   constructor(private router: Router, private authService: AuthService, private firestore: Firestore) { 
     this.historialCollection = collection(this.firestore, 'evaluaciones');
@@ -535,8 +539,8 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     this.mostrarResultado = true;
     
-    // Guardar en el historial si el usuario está logueado
-    if (this.usuarioLogueado && this.usuarioActual) {
+    // Guardar en el historial si el usuario está logueado y no está en modo edición
+    if (this.usuarioLogueado && this.usuarioActual && !this.modoEdicion) {
       this.guardarEvaluacion(promedio, this.resultadoTexto);
     }
   }
@@ -562,5 +566,166 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   getPromedioClass(promedio: number): string {
     return promedio >= 6 ? 'text-success fw-bold' : 'text-danger fw-bold';
+  }
+
+  async eliminarEvaluacion(id: string) {
+    if (confirm('¿Estás seguro de que quieres eliminar esta evaluación?')) {
+      try {
+        const docRef = doc(this.firestore, 'evaluaciones', id);
+        await deleteDoc(docRef);
+        this.cargarHistorial(); // Recargar el historial
+      } catch (error) {
+        console.error('Error al eliminar la evaluación:', error);
+        alert('Error al eliminar la evaluación');
+      }
+    }
+  }
+
+  editarEvaluacion(evaluacion: EvaluacionHistorial) {
+    this.modoEdicion = true;
+    this.evaluacionEditando = evaluacion;
+    
+    // Cargar los datos en el formulario
+    this.nombre = evaluacion.nombre || '';
+    this.materia = evaluacion.materia || '';
+    this.tipo = evaluacion.tipo || 'tareas';
+    
+    // Limpiar arrays primero
+    this.calificaciones = [];
+    this.titulosTareas = [];
+    this.fechasTareas = [];
+    this.descripcionesTareas = [];
+    this.calExamenes = [];
+    
+    // Cargar tareas si existen
+    if (evaluacion.tareas && evaluacion.tareas.length > 0) {
+      evaluacion.tareas.forEach(tarea => {
+        this.calificaciones.push(tarea.calificacion);
+        this.titulosTareas.push(tarea.titulo || '');
+        this.fechasTareas.push(tarea.fecha || '');
+        this.descripcionesTareas.push(tarea.descripcion || '');
+      });
+    } else {
+      // Asegurar al menos un campo vacío
+      this.calificaciones.push(null);
+      this.titulosTareas.push('');
+      this.fechasTareas.push('');
+      this.descripcionesTareas.push('');
+    }
+    
+    // Cargar exámenes si existen
+    if (evaluacion.examenes && evaluacion.examenes.length > 0) {
+      this.calExamenes = [...evaluacion.examenes];
+    } else {
+      // Asegurar al menos un campo vacío
+      this.calExamenes = [null];
+    }
+    
+    // Cargar ponderación si existe
+    if (evaluacion.ponderacionTareas !== undefined) {
+      this.ponderacionTareas = evaluacion.ponderacionTareas;
+    }
+    
+    // Scroll al formulario
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  cancelarEdicion() {
+    this.modoEdicion = false;
+    this.evaluacionEditando = null;
+    this.limpiarFormulario();
+  }
+
+  async actualizarEvaluacion() {
+    if (!this.evaluacionEditando || !this.evaluacionEditando.id) return;
+
+    // Recalcular el promedio con los nuevos datos
+    const calificacionesValidas = this.calificaciones.filter((cal): cal is number => cal != null && cal > 0);
+    const examenesValidos = this.calExamenes.filter((ex): ex is number => ex != null && ex > 0);
+
+    let promedio = 0;
+    let resultadoTexto = '';
+
+    if (this.tipo === 'tareas') {
+      if (calificacionesValidas.length > 0) {
+        promedio = calificacionesValidas.reduce((a, b) => a + b, 0) / calificacionesValidas.length;
+      }
+    } else if (this.tipo === 'tareas_examen') {
+      if (calificacionesValidas.length > 0 && examenesValidos.length > 0) {
+        let tareas = calificacionesValidas.reduce((a, b) => a + b, 0) / calificacionesValidas.length;
+        let examen = examenesValidos.reduce((a, b) => a + b, 0) / examenesValidos.length;
+        promedio = tareas * this.ponderacionTareas + examen * (1 - this.ponderacionTareas);
+      } else if (examenesValidos.length > 0) {
+        promedio = examenesValidos.reduce((a, b) => a + b, 0) / examenesValidos.length;
+      } else if (calificacionesValidas.length > 0) {
+        promedio = calificacionesValidas.reduce((a, b) => a + b, 0) / calificacionesValidas.length;
+      }
+    } else if (this.tipo === 'examen') {
+      if (examenesValidos.length > 0) {
+        promedio = examenesValidos.reduce((a, b) => a + b, 0) / examenesValidos.length;
+      }
+    }
+
+    if (promedio >= 6) {
+      resultadoTexto = `¡Felicidades ${this.nombre}! Estás aprobando con promedio ${promedio.toFixed(2)}.`;
+    } else {
+      resultadoTexto = `Lo siento ${this.nombre}, estás reprobando con promedio ${promedio.toFixed(2)}.`;
+    }
+
+    const datosActualizados: any = {
+      nombre: this.nombre,
+      materia: this.materia,
+      tipo: this.tipo,
+      promedio: promedio,
+      resultado: resultadoTexto
+    };
+
+    // Actualizar tareas si corresponde
+    if (this.tipo === 'tareas' || this.tipo === 'tareas_examen') {
+      datosActualizados.tareas = this.calificaciones.map((cal, i) => ({
+        titulo: this.titulosTareas[i] || `Tarea ${i + 1}`,
+        fecha: this.fechasTareas[i] || '',
+        descripcion: this.descripcionesTareas[i] || '',
+        calificacion: cal || 0
+      })).filter(tarea => tarea.calificacion > 0);
+    }
+
+    // Actualizar exámenes si corresponde
+    if (this.tipo === 'tareas_examen' || this.tipo === 'examen') {
+      datosActualizados.examenes = this.calExamenes.filter((ex): ex is number => ex != null && ex > 0);
+    }
+
+    // Actualizar ponderación si corresponde
+    if (this.tipo === 'tareas_examen') {
+      datosActualizados.ponderacionTareas = this.ponderacionTareas;
+    }
+
+    try {
+      const docRef = doc(this.firestore, 'evaluaciones', this.evaluacionEditando.id);
+      await updateDoc(docRef, datosActualizados);
+      
+      this.cancelarEdicion();
+      this.cargarHistorial();
+      
+      alert('Evaluación actualizada correctamente');
+    } catch (error) {
+      console.error('Error al actualizar la evaluación:', error);
+      alert('Error al actualizar la evaluación');
+    }
+  }
+
+  private limpiarFormulario() {
+    this.nombre = '';
+    this.materia = '';
+    this.tipo = 'tareas';
+    this.calificaciones = [null];
+    this.calExamenes = [null];
+    this.ponderacionTareas = 0.4;
+    this.titulosTareas = [''];
+    this.fechasTareas = [''];
+    this.descripcionesTareas = [''];
+    this.mostrarResultado = false;
+    this.resultadoTexto = '';
+    this.resultadoClase = '';
   }
 }
