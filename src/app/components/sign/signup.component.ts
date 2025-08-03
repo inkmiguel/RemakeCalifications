@@ -60,7 +60,8 @@ export class SignupComponent {
                 id: this.usuarios.id,
                 name: this.usuarios.name,
                 email: this.usuarios.email,
-                password: this.usuarios.password
+                password: this.usuarios.password,
+                tipoUsuario: this.usuarios.tipoUsuario
             });
             
             alert('Usuario registrado exitosamente');

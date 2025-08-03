@@ -11,9 +11,17 @@
           <a class="nav-link active" href="#">Inicio</a>
         </li>
       </ul>
-      <button class="btn btn-outline-light" type="button" (click)="logout()">
-        <i class="bi bi-person-circle"></i> Login
-      </button>
+      <div class="d-flex align-items-center">
+        <span class="text-light me-3" *ngIf="usuarioLogueado && usuarioActual">
+          <i class="bi bi-person-circle me-1"></i>
+          Bienvenido, {{ usuarioActual.name }}
+        </span>
+        <button class="btn btn-outline-light" type="button" 
+                (click)="usuarioLogueado ? logout() : irALogin()">
+          <i class="bi" [ngClass]="usuarioLogueado ? 'bi-box-arrow-right' : 'bi-box-arrow-in-right'"></i>
+          {{ usuarioLogueado ? 'Logout' : 'Login' }}
+        </button>
+      </div>
     </div>
   </div>
 </nav>
@@ -25,7 +33,7 @@
     <div class="col-md-6">
       <h3>Evaluación de Estudiante</h3>
 
-      <div class="mb-3">
+      <div class="mb-3" *ngIf="usuarioLogueado && usuarioActual?.tipoUsuario === 'profesor'">
         <label for="nombre" class="form-label">Nombre del alumno</label>
         <input type="text" id="nombre" class="form-control" [(ngModel)]="nombre" name="nombre">
       </div>
@@ -57,8 +65,8 @@
       <!-- Tareas dinámicas -->
       <div class="mb-3" *ngIf="tipo === 'tareas' || tipo === 'tareas_examen'">
         <label class="form-label">Tareas</label>
-        <div class="form-text mb-2">Los campos se agregan automáticamente. Campos vacíos no se consideran en el cálculo.</div>
-        
+        <div class="form-text mb-2">Tilin inzano el campo de califiacion y darle Enter para generar el siguiente. Campos vacíos no se consideran en el cálculo.</div>
+
         <div *ngFor="let cal of calificaciones; let i = index" class="card mb-3">
           <div class="card-header">
             <div class="d-flex justify-content-between align-items-center">
@@ -90,10 +98,11 @@
               </div>
               <div class="col-md-6">
                 <label class="form-label">Calificación</label>
-                <input type="number" class="form-control" [(ngModel)]="calificaciones[i]" 
+                <input type="number" class="form-control" 
+                       #calInput{{i}}
                        min="0" max="10" step="0.1" name="cal{{i}}" 
                        placeholder="Calificación (opcional)"
-                       (input)="onCalificacionChange(i, $event)"
+                       (keyup)="onCalificacionKeyUp(i, $event)"
                        [disabled]="!calificacionesHabilitadas">
               </div>
             </div>
@@ -107,10 +116,11 @@
         <label class="form-label">Calificaciones de exámenes</label>
         <div class="form-text mb-2">Puedes agregar varios exámenes. Campos vacíos no se consideran en el cálculo.</div>
         <div *ngFor="let ex of calExamenes; let j = index" class="input-group mb-2">
-          <input type="number" class="form-control" [(ngModel)]="calExamenes[j]"
+          <input type="number" class="form-control" 
+                 #exInput{{j}}
                  min="0" max="10" step="0.1" name="examen{{j}}"
                  placeholder="Calificación Examen {{j + 1}} (opcional)"
-                 (input)="onExamenChange(j, $event)"
+                 (keyup)="onExamenKeyUp(j, $event)"
                  [disabled]="!calificacionesHabilitadas">
           <button class="btn btn-outline-danger" type="button"
                   (click)="eliminarExamen(j)"
@@ -144,7 +154,9 @@
       <!-- Tabla de historial de evaluaciones solo si usuario está logueado -->
       <div class="border rounded p-3 bg-white">
         <ng-container *ngIf="usuarioLogueado; else noLoginMsg">
-          <h5 class="mb-3">Historial de Evaluaciones</h5>
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">Historial de Evaluaciones</h5>
+          </div>
           <table class="table table-sm table-striped mb-0">
             <thead>
               <tr>

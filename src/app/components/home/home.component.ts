@@ -215,16 +215,96 @@ export class HomeComponent implements OnInit, OnDestroy {
       return;
     }
     const valor = parseFloat(inputValue);
-    // Solo aceptar valores entre 0 y 100
+    // Solo aceptar valores entre 0 y 100 sin interferir con el foco
     if (!isNaN(valor) && valor >= 0 && valor <= 100) {
       this.calificaciones[index] = valor;
-      // Si es el último campo y tiene un valor válido mayor a 0, agregar un nuevo campo
-      if (index === this.calificaciones.length - 1 && valor > 0) {
-        this.agregarCalificacion();
-      }
     } else if (valor > 100) {
-      // Si el valor es mayor a 100, lo ignoramos y dejamos el valor anterior
+      // Si el valor es mayor a 100, lo limitamos a 100 pero mantenemos el foco
+      event.target.value = '100';
       this.calificaciones[index] = 100;
+    }
+  }
+
+  onCalificacionKeyDown(index: number, event: KeyboardEvent): void {
+    const inputElement = event.target as HTMLInputElement;
+    
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const valor = parseFloat(inputElement.value);
+      
+      // Actualizar el valor en el array
+      this.calificaciones[index] = isNaN(valor) ? null : valor;
+      
+      // Solo generar nuevo campo si hay un valor válido, es el último campo Y presionamos Enter
+      if (!isNaN(valor) && valor > 0 && index === this.calificaciones.length - 1) {
+        this.agregarCalificacion();
+        
+        // Enfocar el siguiente campo después de un pequeño delay
+        setTimeout(() => {
+          const nextInput = document.querySelector(`input[name="cal${index + 1}"]`) as HTMLInputElement;
+          if (nextInput) {
+            nextInput.focus();
+          }
+        }, 100);
+      } else if (!isNaN(valor) && valor > 0 && index < this.calificaciones.length - 1) {
+        // Si no es el último campo, simplemente enfocar el siguiente
+        setTimeout(() => {
+          const nextInput = document.querySelector(`input[name="cal${index + 1}"]`) as HTMLInputElement;
+          if (nextInput) {
+            nextInput.focus();
+          }
+        }, 100);
+      }
+    }
+    // Para cualquier otra tecla, solo actualizar el valor sin perder foco
+    else if (!isNaN(parseFloat(inputElement.value))) {
+      // Actualizar el valor en tiempo real pero sin interrumpir la escritura
+      setTimeout(() => {
+        const valor = parseFloat(inputElement.value);
+        this.calificaciones[index] = isNaN(valor) ? null : valor;
+      }, 0);
+    }
+  }
+
+  onCalificacionInput(index: number, event: any): void {
+    const inputElement = event.target as HTMLInputElement;
+    const valor = parseFloat(inputElement.value);
+    
+    // Actualizar el valor sin interferir con el foco
+    this.calificaciones[index] = isNaN(valor) ? null : valor;
+  }
+
+  onCalificacionKeyUp(index: number, event: KeyboardEvent): void {
+    const inputElement = event.target as HTMLInputElement;
+    const valor = parseFloat(inputElement.value);
+    
+    // Actualizar el valor en el array sin interferir con el foco
+    this.calificaciones[index] = isNaN(valor) || inputElement.value === '' ? null : valor;
+    
+    // Solo cuando se presiona Enter
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      
+      // Solo generar nuevo campo si hay un valor válido, es el último campo Y presionamos Enter
+      if (!isNaN(valor) && valor > 0 && index === this.calificaciones.length - 1) {
+        this.agregarCalificacion();
+        
+        // Enfocar el siguiente campo después de un pequeño delay
+        setTimeout(() => {
+          const nextInput = document.querySelector(`input[name="cal${index + 1}"]`) as HTMLInputElement;
+          if (nextInput) {
+            nextInput.focus();
+          }
+        }, 50);
+      } else if (!isNaN(valor) && valor > 0 && index < this.calificaciones.length - 1) {
+        // Si no es el último campo, simplemente enfocar el siguiente
+        setTimeout(() => {
+          const nextInput = document.querySelector(`input[name="cal${index + 1}"]`) as HTMLInputElement;
+          if (nextInput) {
+            nextInput.focus();
+          }
+        }, 50);
+      }
     }
   }
 
@@ -235,15 +315,95 @@ export class HomeComponent implements OnInit, OnDestroy {
       return;
     }
     const valor = parseFloat(inputValue);
-    // Solo aceptar valores entre 0 y 100
+    // Solo aceptar valores entre 0 y 100 sin interferir con el foco
     if (!isNaN(valor) && valor >= 0 && valor <= 100) {
       this.calExamenes[index] = valor;
-      if (index === this.calExamenes.length - 1 && valor > 0) {
-        this.agregarExamen();
-      }
     } else if (valor > 100) {
-      // Si el valor es mayor a 100, lo ajustamos a 100
+      // Si el valor es mayor a 100, lo limitamos a 100 pero mantenemos el foco
+      event.target.value = '100';
       this.calExamenes[index] = 100;
+    }
+  }
+
+  onExamenKeyDown(index: number, event: KeyboardEvent): void {
+    const inputElement = event.target as HTMLInputElement;
+    
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const valor = parseFloat(inputElement.value);
+      
+      // Actualizar el valor en el array
+      this.calExamenes[index] = isNaN(valor) ? null : valor;
+      
+      // Solo generar nuevo campo si hay un valor válido, es el último campo Y presionamos Enter
+      if (!isNaN(valor) && valor > 0 && index === this.calExamenes.length - 1) {
+        this.agregarExamen();
+        
+        // Enfocar el siguiente campo después de un pequeño delay
+        setTimeout(() => {
+          const nextInput = document.querySelector(`input[name="examen${index + 1}"]`) as HTMLInputElement;
+          if (nextInput) {
+            nextInput.focus();
+          }
+        }, 100);
+      } else if (!isNaN(valor) && valor > 0 && index < this.calExamenes.length - 1) {
+        // Si no es el último campo, simplemente enfocar el siguiente
+        setTimeout(() => {
+          const nextInput = document.querySelector(`input[name="examen${index + 1}"]`) as HTMLInputElement;
+          if (nextInput) {
+            nextInput.focus();
+          }
+        }, 100);
+      }
+    }
+    // Para cualquier otra tecla, solo actualizar el valor sin perder foco
+    else if (!isNaN(parseFloat(inputElement.value))) {
+      setTimeout(() => {
+        const valor = parseFloat(inputElement.value);
+        this.calExamenes[index] = isNaN(valor) ? null : valor;
+      }, 0);
+    }
+  }
+
+  onExamenInput(index: number, event: any): void {
+    const inputElement = event.target as HTMLInputElement;
+    const valor = parseFloat(inputElement.value);
+    
+    // Actualizar el valor sin interferir con el foco
+    this.calExamenes[index] = isNaN(valor) ? null : valor;
+  }
+
+  onExamenKeyUp(index: number, event: KeyboardEvent): void {
+    const inputElement = event.target as HTMLInputElement;
+    const valor = parseFloat(inputElement.value);
+    
+    // Actualizar el valor en el array sin interferir con el foco
+    this.calExamenes[index] = isNaN(valor) || inputElement.value === '' ? null : valor;
+    
+    // Solo cuando se presiona Enter
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      
+      // Solo generar nuevo campo si hay un valor válido, es el último campo Y presionamos Enter
+      if (!isNaN(valor) && valor > 0 && index === this.calExamenes.length - 1) {
+        this.agregarExamen();
+        
+        // Enfocar el siguiente campo después de un pequeño delay
+        setTimeout(() => {
+          const nextInput = document.querySelector(`input[name="examen${index + 1}"]`) as HTMLInputElement;
+          if (nextInput) {
+            nextInput.focus();
+          }
+        }, 50);
+      } else if (!isNaN(valor) && valor > 0 && index < this.calExamenes.length - 1) {
+        // Si no es el último campo, simplemente enfocar el siguiente
+        setTimeout(() => {
+          const nextInput = document.querySelector(`input[name="examen${index + 1}"]`) as HTMLInputElement;
+          if (nextInput) {
+            nextInput.focus();
+          }
+        }, 50);
+      }
     }
   }
 

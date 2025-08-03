@@ -126,6 +126,83 @@ body {
   font-weight: 400;
 }
 
+/* Estilos para el select */
+.form-group select {
+  width: 100%;
+  padding: 10px 35px 10px 35px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--secondary-color);
+  background-image: url("data:image/svg+xml;charset=UTF-8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6,9 12,15 18,9'></polyline></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.form-group select::-moz-appearance {
+  -moz-appearance: none;
+}
+
+.form-group select::-ms-expand {
+  display: none;
+}
+
+.form-group select:-moz-focusring {
+  color: transparent;
+  text-shadow: 0 0 0 var(--text-primary);
+}
+
+.form-group select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  background: white;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  background-image: url("data:image/svg+xml;charset=UTF-8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236366f1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6,9 12,15 18,9'></polyline></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+}
+
+.form-group select:hover {
+  border-color: var(--primary-color);
+  background: white;
+}
+
+.form-group select:invalid {
+  color: var(--text-secondary);
+}
+
+.form-group select:valid {
+  color: var(--text-primary);
+}
+
+/* Estilos para las opciones del select */
+.form-group select option {
+  background: white;
+  color: var(--text-primary);
+  padding: 12px;
+  border: none;
+  font-weight: 500;
+}
+
+.form-group select option:disabled {
+  color: var(--text-secondary);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.form-group select option:checked {
+  background: var(--primary-color);
+  color: white;
+}
+
 /* Iconos en los inputs */
 .form-group i {
   position: absolute;
@@ -142,6 +219,10 @@ body {
   color: var(--primary-color);
 }
 
+.form-group select:focus + i {
+  color: var(--primary-color);
+}
+
 /* Iconos específicos con pseudo-elementos */
 .icon-email::before {
   content: "✉";
@@ -149,6 +230,14 @@ body {
 
 .icon-password::before {
   content: "🔒";
+}
+
+.icon-user::before {
+  content: "👤";
+}
+
+.icon-user-type::before {
+  content: "🎭";
 }
 
 /* Opciones del formulario */
