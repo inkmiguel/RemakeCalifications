@@ -65,9 +65,9 @@
       <!-- Tareas dinámicas -->
       <div class="mb-3" *ngIf="tipo === 'tareas' || tipo === 'tareas_examen'">
         <label class="form-label">Tareas</label>
-        <div class="form-text mb-2">Tilin inzano el campo de califiacion y darle Enter para generar el siguiente. Campos vacíos no se consideran en el cálculo.</div>
+        <div class="form-text mb-2">Tilin inzano potaxie digital fortnite el campo de califiacion y darle Enter para generar el siguiente. Campos vacíos no se consideran en el cálculo.</div>
 
-        <div *ngFor="let cal of calificaciones; let i = index" class="card mb-3">
+        <div *ngFor="let cal of calificaciones; let i = index; trackBy: trackByIndex" class="card mb-3">
           <div class="card-header">
             <div class="d-flex justify-content-between align-items-center">
               <h6 class="mb-0">Tarea {{i + 1}}</h6>
@@ -100,9 +100,11 @@
                 <label class="form-label">Calificación</label>
                 <input type="number" class="form-control" 
                        #calInput{{i}}
+                       [value]="calificaciones[i] || ''"
                        min="0" max="10" step="0.1" name="cal{{i}}" 
                        placeholder="Calificación (opcional)"
                        (keyup)="onCalificacionKeyUp(i, $event)"
+                       (blur)="onCalificacionBlur(i, $event)"
                        [disabled]="!calificacionesHabilitadas">
               </div>
             </div>
@@ -115,12 +117,14 @@
       <div class="mb-3" *ngIf="tipo === 'tareas_examen' || tipo === 'examen'">
         <label class="form-label">Calificaciones de exámenes</label>
         <div class="form-text mb-2">Puedes agregar varios exámenes. Campos vacíos no se consideran en el cálculo.</div>
-        <div *ngFor="let ex of calExamenes; let j = index" class="input-group mb-2">
+        <div *ngFor="let ex of calExamenes; let j = index; trackBy: trackByIndex" class="input-group mb-2">
           <input type="number" class="form-control" 
                  #exInput{{j}}
+                 [value]="calExamenes[j] || ''"
                  min="0" max="10" step="0.1" name="examen{{j}}"
                  placeholder="Calificación Examen {{j + 1}} (opcional)"
                  (keyup)="onExamenKeyUp(j, $event)"
+                 (blur)="onExamenBlur(j, $event)"
                  [disabled]="!calificacionesHabilitadas">
           <button class="btn btn-outline-danger" type="button"
                   (click)="eliminarExamen(j)"

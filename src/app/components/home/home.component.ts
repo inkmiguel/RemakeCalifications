@@ -165,15 +165,40 @@ export class HomeComponent implements OnInit, OnDestroy {
     get calificacionesHabilitadas(): boolean {
     return this.tipo !== '';
   }
+
+  trackByIndex(index: number, item: any): number {
+    return index;
+  }
   agregarCalificacion(): void {
     this.calificaciones.push(null);
     this.titulosTareas.push('');
     this.fechasTareas.push('');
     this.descripcionesTareas.push('');
+    
+    // Forzar la detección de cambios para que los nuevos campos aparezcan en blanco
+    setTimeout(() => {
+      const newIndex = this.calificaciones.length - 1;
+      const tituloInput = document.querySelector(`input[name="titulo${newIndex}"]`) as HTMLInputElement;
+      const fechaInput = document.querySelector(`input[name="fecha${newIndex}"]`) as HTMLInputElement;
+      const descripcionTextarea = document.querySelector(`textarea[name="descripcion${newIndex}"]`) as HTMLTextAreaElement;
+      const calInput = document.querySelector(`input[name="cal${newIndex}"]`) as HTMLInputElement;
+      
+      if (tituloInput) tituloInput.value = '';
+      if (fechaInput) fechaInput.value = '';
+      if (descripcionTextarea) descripcionTextarea.value = '';
+      if (calInput) calInput.value = '';
+    }, 10);
   }
 
   agregarExamen(): void {
     this.calExamenes.push(null);
+    
+    // Forzar que el nuevo campo aparezca en blanco
+    setTimeout(() => {
+      const newIndex = this.calExamenes.length - 1;
+      const examenInput = document.querySelector(`input[name="examen${newIndex}"]`) as HTMLInputElement;
+      if (examenInput) examenInput.value = '';
+    }, 10);
   }
 
   eliminarExamen(index: number): void {
@@ -276,14 +301,14 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   onCalificacionKeyUp(index: number, event: KeyboardEvent): void {
     const inputElement = event.target as HTMLInputElement;
-    const valor = parseFloat(inputElement.value);
-    
-    // Actualizar el valor en el array sin interferir con el foco
-    this.calificaciones[index] = isNaN(valor) || inputElement.value === '' ? null : valor;
     
     // Solo cuando se presiona Enter
     if (event.key === 'Enter') {
       event.preventDefault();
+      const valor = parseFloat(inputElement.value);
+      
+      // Primero actualizar el valor en el array del campo actual
+      this.calificaciones[index] = isNaN(valor) || inputElement.value === '' ? null : valor;
       
       // Solo generar nuevo campo si hay un valor válido, es el último campo Y presionamos Enter
       if (!isNaN(valor) && valor > 0 && index === this.calificaciones.length - 1) {
@@ -294,6 +319,8 @@ export class HomeComponent implements OnInit, OnDestroy {
           const nextInput = document.querySelector(`input[name="cal${index + 1}"]`) as HTMLInputElement;
           if (nextInput) {
             nextInput.focus();
+            // Asegurar que el campo esté vacío
+            nextInput.value = '';
           }
         }, 50);
       } else if (!isNaN(valor) && valor > 0 && index < this.calificaciones.length - 1) {
@@ -306,6 +333,15 @@ export class HomeComponent implements OnInit, OnDestroy {
         }, 50);
       }
     }
+    // Para cualquier otra tecla, NO hacer nada para evitar interferencia
+  }
+
+  onCalificacionBlur(index: number, event: any): void {
+    const inputElement = event.target as HTMLInputElement;
+    const valor = parseFloat(inputElement.value);
+    
+    // Actualizar el valor en el array cuando el campo pierde el foco
+    this.calificaciones[index] = isNaN(valor) || inputElement.value === '' ? null : valor;
   }
 
   onExamenChange(index: number, event: any): void {
@@ -375,14 +411,14 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   onExamenKeyUp(index: number, event: KeyboardEvent): void {
     const inputElement = event.target as HTMLInputElement;
-    const valor = parseFloat(inputElement.value);
-    
-    // Actualizar el valor en el array sin interferir con el foco
-    this.calExamenes[index] = isNaN(valor) || inputElement.value === '' ? null : valor;
     
     // Solo cuando se presiona Enter
     if (event.key === 'Enter') {
       event.preventDefault();
+      const valor = parseFloat(inputElement.value);
+      
+      // Primero actualizar el valor en el array del campo actual
+      this.calExamenes[index] = isNaN(valor) || inputElement.value === '' ? null : valor;
       
       // Solo generar nuevo campo si hay un valor válido, es el último campo Y presionamos Enter
       if (!isNaN(valor) && valor > 0 && index === this.calExamenes.length - 1) {
@@ -393,6 +429,8 @@ export class HomeComponent implements OnInit, OnDestroy {
           const nextInput = document.querySelector(`input[name="examen${index + 1}"]`) as HTMLInputElement;
           if (nextInput) {
             nextInput.focus();
+            // Asegurar que el campo esté vacío
+            nextInput.value = '';
           }
         }, 50);
       } else if (!isNaN(valor) && valor > 0 && index < this.calExamenes.length - 1) {
@@ -405,6 +443,15 @@ export class HomeComponent implements OnInit, OnDestroy {
         }, 50);
       }
     }
+    // Para cualquier otra tecla, NO hacer nada para evitar interferencia
+  }
+
+  onExamenBlur(index: number, event: any): void {
+    const inputElement = event.target as HTMLInputElement;
+    const valor = parseFloat(inputElement.value);
+    
+    // Actualizar el valor en el array cuando el campo pierde el foco
+    this.calExamenes[index] = isNaN(valor) || inputElement.value === '' ? null : valor;
   }
 
 
