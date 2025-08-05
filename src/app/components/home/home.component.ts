@@ -16,6 +16,13 @@ export class HomeComponent implements OnInit, OnDestroy {
   usuarioActual: Usuario | null = null;
   private authSubscription?: Subscription;
   historial: EvaluacionHistorial[] = [];
+  historialAgrupado: { [key: string]: { 
+    materia: string; 
+    tipo: string; 
+    promedioGeneral: number; 
+    totalEstudiantes: number;
+    evaluaciones: EvaluacionHistorial[] 
+  } } = {};
   
   // Variables para edición
   modoEdicion = false;
@@ -76,8 +83,28 @@ export class HomeComponent implements OnInit, OnDestroy {
       // Extraer materias únicas para autocompletado
       this.extraerMateriasYTareas();
       
+      // Agrupar historial por materia y tipo (especialmente útil para profesores)
+      this.agruparHistorial();
+      
       // Actualizar la gráfica con el historial global
       this.actualizarGraficaGlobal();
+    });
+
+    // Si es profesor, cargar lista de estudiantes para autocompletado
+    if (this.usuarioActual?.tipoUsuario === 'profesor') {
+      this.cargarEstudiantes();
+    }
+  }
+
+  cargarEstudiantes() {
+    const usuariosCollection = collection(this.firestore, 'usuarios');
+    const estudiantesQuery = query(
+      usuariosCollection,
+      where('tipoUsuario', '==', 'estudiante')
+    );
+
+    collectionData(estudiantesQuery, { idField: 'id' }).subscribe((data: any[]) => {
+      this.estudiantesDisponibles = data as Usuario[];
     });
   }
 
@@ -93,15 +120,54 @@ export class HomeComponent implements OnInit, OnDestroy {
       'examen': 'rgba(255, 99, 132, 0.7)'         // Rojo
     };
 
-    // Agregar promedios de las evaluaciones del historial (más recientes primero)
-    this.historial.forEach((evaluacion, index) => {
-      if (evaluacion.promedio !== undefined && evaluacion.promedio > 0) {
-        const fechaStr = evaluacion.fecha ? evaluacion.fecha.toLocaleDateString('es-ES') : '';
-        labels.push(`${evaluacion.materia} (${fechaStr})`);
-        datos.push(evaluacion.promedio);
-        colores.push(coloresTipo[evaluacion.tipo as keyof typeof coloresTipo] || 'rgba(75, 192, 192, 0.7)');
-      }
-    });
+    // Si es profesor y hay datos agrupados, usar vista agrupada
+    if (this.usuarioActual?.tipoUsuario === 'profesor' && Object.keys(this.historialAgrupado).length > 0) {
+      Object.keys(this.historialAgrupado).forEach(key => {
+        const grupo = this.historialAgrupado[key];
+        
+        // Verificar si hay estudiantes reprobados (promedio < 6)
+        const estudiantesReprobados = grupo.evaluaciones.filter(ev => ev.promedio < 6);
+        const hayReprobados = estudiantesReprobados.length > 0;
+        
+        // Crear label con información adicional
+        let label = `${grupo.materia} (${this.getTipoDisplay(grupo.tipo)})`;
+        if (hayReprobados) {
+          label += ` - ${estudiantesReprobados.length} reprobado(s)`;
+        }
+        
+        labels.push(label);
+        datos.push(grupo.promedioGeneral);
+        
+        // Color rojo si hay reprobados, sino color normal según tipo
+        if (hayReprobados) {
+          colores.push('rgba(220, 53, 69, 0.7)'); // Rojo para grupos con reprobados
+        } else {
+          colores.push(coloresTipo[grupo.tipo as keyof typeof coloresTipo] || 'rgba(75, 192, 192, 0.7)');
+        }
+      });
+    } else {
+      // Vista individual (para estudiantes o cuando no hay agrupación)
+      this.historial.forEach((evaluacion, index) => {
+        if (evaluacion.promedio !== undefined && evaluacion.promedio > 0) {
+          const fechaStr = evaluacion.fecha ? evaluacion.fecha.toLocaleDateString('es-ES') : '';
+          let label = `${evaluacion.materia}`;
+          if (this.usuarioActual?.tipoUsuario === 'profesor') {
+            label += ` - ${evaluacion.nombre}`;
+          }
+          label += ` (${fechaStr})`;
+          
+          labels.push(label);
+          datos.push(evaluacion.promedio);
+          
+          // Color rojo si está reprobado, sino color normal según tipo
+          if (evaluacion.promedio < 6) {
+            colores.push('rgba(220, 53, 69, 0.7)'); // Rojo para reprobados
+          } else {
+            colores.push(coloresTipo[evaluacion.tipo as keyof typeof coloresTipo] || 'rgba(75, 192, 192, 0.7)');
+          }
+        }
+      });
+    }
 
     // Si no hay historial, mostrar mensaje en la gráfica
     if (datos.length === 0) {
@@ -115,7 +181,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       labels: [...labels],
       datasets: [
         {
-          label: 'Promedio por Materia',
+          label: this.usuarioActual?.tipoUsuario === 'profesor' ? 'Promedio General por Grupo' : 'Promedio por Materia',
           data: [...datos],
           backgroundColor: colores,
           borderColor: colores.map(color => color.replace('0.7', '1')),
@@ -174,6 +240,40 @@ export class HomeComponent implements OnInit, OnDestroy {
     });
     
     this.materiasDisponibles = Array.from(materiasSet).sort();
+  }
+
+  private agruparHistorial() {
+    this.historialAgrupado = {};
+    
+    // Solo agrupar si es profesor
+    if (this.usuarioActual?.tipoUsuario === 'profesor') {
+      this.historial.forEach(evaluacion => {
+        const key = `${evaluacion.materia}-${evaluacion.tipo}`;
+        
+        if (!this.historialAgrupado[key]) {
+          this.historialAgrupado[key] = {
+            materia: evaluacion.materia,
+            tipo: evaluacion.tipo,
+            promedioGeneral: 0,
+            totalEstudiantes: 0,
+            evaluaciones: []
+          };
+        }
+        
+        this.historialAgrupado[key].evaluaciones.push(evaluacion);
+      });
+      
+      // Calcular promedios generales
+      Object.keys(this.historialAgrupado).forEach(key => {
+        const grupo = this.historialAgrupado[key];
+        const promedios = grupo.evaluaciones.map(ev => ev.promedio || 0);
+        grupo.promedioGeneral = promedios.reduce((sum, p) => sum + p, 0) / promedios.length;
+        grupo.totalEstudiantes = grupo.evaluaciones.length;
+        
+        // Ordenar evaluaciones por fecha (más reciente primero)
+        grupo.evaluaciones.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+      });
+    }
   }
 
   async guardarEvaluacion(promedio: number, resultadoTexto: string) {
@@ -321,11 +421,17 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   }
   nombre = '';
+  correoAlumno = '';
   materia = '';
   tipo = 'tareas'; // 'tareas', 'tareas_examen', 'examen' - Valor por defecto
   calificaciones: (number | null)[] = [null];
   calExamenes: (number | null)[] = [null];
   ponderacionTareas: number = 0.4; // Por defecto 40% tareas, 60% examen
+
+  // Variables para búsqueda de estudiantes
+  estudiantesDisponibles: Usuario[] = [];
+  estudiantesFiltrados: Usuario[] = [];
+  mostrarSugerenciasEstudiantes = false;
 
   // Nuevos arrays para datos adicionales de las tareas
   titulosTareas: string[] = [''];
@@ -345,17 +451,63 @@ export class HomeComponent implements OnInit, OnDestroy {
         callbacks: {
           title: (context) => {
             const index = context[0].dataIndex;
-            if (this.historial && this.historial[index]) {
+            
+            // Si es profesor con vista agrupada
+            if (this.usuarioActual?.tipoUsuario === 'profesor' && Object.keys(this.historialAgrupado).length > 0) {
+              const keys = Object.keys(this.historialAgrupado);
+              if (keys[index]) {
+                const grupo = this.historialAgrupado[keys[index]];
+                return `${grupo.materia} - ${this.getTipoDisplay(grupo.tipo)}`;
+              }
+            } else if (this.historial && this.historial[index]) {
+              // Vista individual
               const evaluacion = this.historial[index];
-              return `${evaluacion.materia} - ${this.getTipoDisplay(evaluacion.tipo)}`;
+              let title = `${evaluacion.materia} - ${this.getTipoDisplay(evaluacion.tipo)}`;
+              if (this.usuarioActual?.tipoUsuario === 'profesor') {
+                title += ` - ${evaluacion.nombre}`;
+              }
+              return title;
             }
             return context[0].label || '';
           },
           label: (context) => {
             const index = context.dataIndex;
-            if (this.historial && this.historial[index]) {
+            const promedio = context.parsed.y;
+            
+            // Si es profesor con vista agrupada
+            if (this.usuarioActual?.tipoUsuario === 'profesor' && Object.keys(this.historialAgrupado).length > 0) {
+              const keys = Object.keys(this.historialAgrupado);
+              if (keys[index]) {
+                const grupo = this.historialAgrupado[keys[index]];
+                const estudiantesReprobados = grupo.evaluaciones.filter(ev => ev.promedio < 6);
+                const estudiantesAprobados = grupo.evaluaciones.filter(ev => ev.promedio >= 6);
+                
+                const labels = [
+                  `Promedio General: ${promedio.toFixed(2)}`,
+                  `Total Estudiantes: ${grupo.totalEstudiantes}`,
+                  `Aprobados: ${estudiantesAprobados.length}`,
+                  `Reprobados: ${estudiantesReprobados.length}`
+                ];
+                
+                if (estudiantesReprobados.length > 0) {
+                  labels.push('', 'Estudiantes Reprobados:');
+                  estudiantesReprobados.forEach(est => {
+                    labels.push(`• ${est.nombre}: ${est.promedio.toFixed(2)}`);
+                  });
+                }
+                
+                if (estudiantesAprobados.length > 0 && estudiantesAprobados.length <= 10) {
+                  labels.push('', 'Estudiantes Aprobados:');
+                  estudiantesAprobados.forEach(est => {
+                    labels.push(`• ${est.nombre}: ${est.promedio.toFixed(2)}`);
+                  });
+                }
+                
+                return labels;
+              }
+            } else if (this.historial && this.historial[index]) {
+              // Vista individual
               const evaluacion = this.historial[index];
-              const promedio = context.parsed.y;
               const estado = promedio >= 6 ? 'Aprobado' : 'Reprobado';
               return [
                 `Promedio: ${promedio.toFixed(2)}`,
@@ -363,7 +515,7 @@ export class HomeComponent implements OnInit, OnDestroy {
                 `Fecha: ${evaluacion.fecha ? evaluacion.fecha.toLocaleDateString('es-ES') : 'N/A'}`
               ];
             }
-            return `Promedio: ${context.parsed.y}`;
+            return `Promedio: ${promedio.toFixed(2)}`;
           }
         }
       },
@@ -387,7 +539,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       x: {
         title: {
           display: true,
-          text: 'Evaluaciones'
+          text: this.usuarioActual?.tipoUsuario === 'profesor' ? 'Grupos de Evaluación' : 'Evaluaciones'
         }
       }
     }
@@ -1045,6 +1197,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private limpiarFormulario() {
     this.nombre = '';
+    this.correoAlumno = '';
     this.materia = '';
     this.tipo = 'tareas';
     this.calificaciones = [null];
@@ -1060,8 +1213,10 @@ export class HomeComponent implements OnInit, OnDestroy {
     
     // Limpiar variables de autocompletado
     this.mostrarSugerenciasMaterias = false;
+    this.mostrarSugerenciasEstudiantes = false;
     this.mostrarTareasPrevias = false;
     this.materiasFiltradas = [];
+    this.estudiantesFiltrados = [];
     this.tareasPreviasDisponibles = [];
     this.evaluacionExistenteInfo = null;
   }
@@ -1161,6 +1316,58 @@ export class HomeComponent implements OnInit, OnDestroy {
     }, 100);
   }
 
+  // Funciones para autocompletado de estudiantes por correo
+  onCorreoInput(event: any) {
+    const valor = event.target.value;
+    this.correoAlumno = valor;
+    
+    // Solo buscar si es profesor
+    if (this.usuarioActual?.tipoUsuario !== 'profesor') {
+      return;
+    }
+    
+    if (valor && valor.length > 0) {
+      this.estudiantesFiltrados = this.estudiantesDisponibles.filter(estudiante => 
+        estudiante.email.toLowerCase().includes(valor.toLowerCase())
+      );
+      this.mostrarSugerenciasEstudiantes = this.estudiantesFiltrados.length > 0;
+    } else {
+      this.mostrarSugerenciasEstudiantes = false;
+      // Si se borra el correo, limpiar también el nombre
+      this.nombre = '';
+    }
+  }
+
+  seleccionarEstudiante(estudiante: Usuario) {
+    this.correoAlumno = estudiante.email;
+    this.nombre = estudiante.name;
+    this.mostrarSugerenciasEstudiantes = false;
+  }
+
+  ocultarSugerenciasEstudiantes() {
+    // Pequeño delay para permitir click en sugerencias
+    setTimeout(() => {
+      this.mostrarSugerenciasEstudiantes = false;
+    }, 200);
+  }
+
+  buscarEstudiantePorCorreo() {
+    if (!this.correoAlumno || this.usuarioActual?.tipoUsuario !== 'profesor') {
+      return;
+    }
+
+    const estudiante = this.estudiantesDisponibles.find(est => 
+      est.email.toLowerCase() === this.correoAlumno.toLowerCase()
+    );
+
+    if (estudiante) {
+      this.nombre = estudiante.name;
+    } else {
+      // Si no se encuentra el estudiante, limpiar el nombre
+      this.nombre = '';
+    }
+  }
+
   ocultarSugerenciasMaterias() {
     // Pequeño delay para permitir que el click en la sugerencia se procese
     setTimeout(() => {
@@ -1178,5 +1385,23 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (this.materia && this.materia.trim()) {
       this.cargarTareasPrevias(this.materia);
     }
+  }
+
+  // Función helper para obtener las claves del historial agrupado
+  getHistorialAgrupadoKeys(): string[] {
+    return Object.keys(this.historialAgrupado).sort((a, b) => {
+      const grupoA = this.historialAgrupado[a];
+      const grupoB = this.historialAgrupado[b];
+      // Ordenar por materia y luego por tipo
+      if (grupoA.materia !== grupoB.materia) {
+        return grupoA.materia.localeCompare(grupoB.materia);
+      }
+      return grupoA.tipo.localeCompare(grupoB.tipo);
+    });
+  }
+
+  // Función helper para determinar si mostrar vista agrupada o individual
+  mostrarVistaAgrupada(): boolean {
+    return this.usuarioActual?.tipoUsuario === 'profesor' && Object.keys(this.historialAgrupado).length > 0;
   }
 }

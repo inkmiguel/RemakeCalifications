@@ -38,9 +38,41 @@
       
       <h3>Evaluación de Estudiante</h3>
 
-      <div class="mb-3" *ngIf="usuarioLogueado && usuarioActual?.tipoUsuario === 'profesor'">
+      <div class="mb-3">
+        <label for="correoAlumno">Correo del Estudiante</label>
+        <div class="position-relative">
+          <input type="email" id="correoAlumno" class="form-control" 
+                 [(ngModel)]="correoAlumno" name="correoAlumno"
+                 (input)="onCorreoInput($event)"
+                 (blur)="buscarEstudiantePorCorreo(); ocultarSugerenciasEstudiantes()"
+                 placeholder="Escribe el correo del estudiante..."
+                 autocomplete="off">
+          
+          <!-- Dropdown de sugerencias de estudiantes -->
+          <div class="dropdown-menu show position-absolute w-100" 
+               *ngIf="mostrarSugerenciasEstudiantes && estudiantesFiltrados.length > 0 && usuarioActual?.tipoUsuario === 'profesor'"
+               style="z-index: 1050; max-height: 200px; overflow-y: auto;">
+            <button class="dropdown-item" 
+                    *ngFor="let estudiante of estudiantesFiltrados"
+                    (click)="seleccionarEstudiante(estudiante)">
+              <div class="d-flex justify-content-between">
+                <span>{{ estudiante.email }}</span>
+                <small class="text-muted">{{ estudiante.name }}</small>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-3">
         <label for="nombre" class="form-label">Nombre del alumno</label>
-        <input type="text" id="nombre" class="form-control" [(ngModel)]="nombre" name="nombre">
+        <input type="text" id="nombre" class="form-control" 
+               [(ngModel)]="nombre" name="nombre"
+               [readonly]="usuarioActual?.tipoUsuario === 'profesor' && nombre !== ''"
+               placeholder="Nombre del estudiante">
+        <div class="form-text" *ngIf="usuarioActual?.tipoUsuario === 'profesor'">
+          El nombre se completará automáticamente al seleccionar un correo de estudiante
+        </div>
       </div>
 
       <div class="mb-3">
@@ -266,6 +298,11 @@
             <span class="badge bg-primary me-1">Azul</span> Solo tareas, 
             <span class="badge bg-warning text-dark me-1">Amarillo</span> Tareas + Examen, 
             <span class="badge bg-danger me-1">Rojo</span> Solo examen
+            <br>
+            <span class="badge bg-danger me-1 mt-1">Rojo Intenso</span> Grupos o estudiantes con reprobados (promedio < 6.0)
+            <ng-container *ngIf="usuarioActual?.tipoUsuario === 'profesor'">
+              <br><small class="text-muted mt-1 d-block">Los profesores ven promedios generales por grupo. Pasa el cursor sobre las barras para ver detalles y nombres de estudiantes reprobados.</small>
+            </ng-container>
           </small>
         </div>
       </div>
@@ -277,10 +314,125 @@
             <h5 class="mb-0">Historial de Evaluaciones</h5>
           </div>
           
-          <!-- Historial detallado con acordeón -->
-          <div class="accordion" id="historialAccordion" *ngIf="historial && historial.length > 0">
-            <div class="accordion-item" *ngFor="let item of historial; let i = index">
-              <h2 class="accordion-header" [id]="'heading' + i">
+          <!-- Vista agrupada para profesores -->
+          <div *ngIf="mostrarVistaAgrupada(); else vistaIndividual">
+            <div class="alert alert-info mb-3">
+              <i class="bi bi-info-circle me-2"></i>
+              <small>Vista agrupada por materia y tipo de evaluación. Expandir para ver evaluaciones individuales.</small>
+            </div>
+            
+            <div class="accordion" id="historialAgrupadoAccordion">
+              <div class="accordion-item" *ngFor="let key of getHistorialAgrupadoKeys(); let i = index">
+                <h2 class="accordion-header" [id]="'headingGroup' + i">
+                  <button class="accordion-button collapsed" type="button" 
+                          data-bs-toggle="collapse" 
+                          [attr.data-bs-target]="'#collapseGroup' + i" 
+                          [attr.aria-expanded]="false" 
+                          [attr.aria-controls]="'collapseGroup' + i">
+                    <div class="w-100">
+                      <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                          <strong>{{ historialAgrupado[key].materia }}</strong>
+                          <br>
+                          <small class="text-muted">{{ getTipoDisplay(historialAgrupado[key].tipo) }} • {{ historialAgrupado[key].totalEstudiantes }} estudiante(s)</small>
+                        </div>
+                        <div class="text-end">
+                          <span [ngClass]="getPromedioClass(historialAgrupado[key].promedioGeneral)" class="fs-5">
+                            {{ historialAgrupado[key].promedioGeneral.toFixed(2) }}
+                          </span>
+                          <br>
+                          <small class="text-muted">Promedio General</small>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                </h2>
+                <div [id]="'collapseGroup' + i" class="accordion-collapse collapse" 
+                     [attr.aria-labelledby]="'headingGroup' + i" 
+                     data-bs-parent="#historialAgrupadoAccordion">
+                  <div class="accordion-body">
+                    <!-- Evaluaciones individuales dentro del grupo -->
+                    <div class="row">
+                      <div class="col-12 mb-2">
+                        <h6 class="text-primary mb-3">
+                          <i class="bi bi-people me-1"></i>Evaluaciones Individuales:
+                        </h6>
+                      </div>
+                    </div>
+                    
+                    <div class="row">
+                      <div class="col-md-6 mb-3" *ngFor="let evaluacion of historialAgrupado[key].evaluaciones">
+                        <div class="card">
+                          <div class="card-header py-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                              <strong class="text-truncate">{{ evaluacion.nombre }}</strong>
+                              <span [ngClass]="getPromedioClass(evaluacion.promedio)" class="fw-bold">
+                                {{ evaluacion.promedio.toFixed(2) }}
+                              </span>
+                            </div>
+                            <small class="text-muted">{{ evaluacion.fecha | date:'short' }}</small>
+                          </div>
+                          <div class="card-body p-2">
+                            
+                            <!-- Detalles de tareas -->
+                            <div *ngIf="evaluacion.tareas && evaluacion.tareas.length > 0" class="mb-2">
+                              <h6 class="small text-primary mb-1">
+                                <i class="bi bi-clipboard-check me-1"></i>Tareas:
+                              </h6>
+                              <div class="small">
+                                <div class="d-flex justify-content-between" *ngFor="let tarea of evaluacion.tareas">
+                                  <span class="text-truncate">{{ tarea.titulo || 'Sin título' }}</span>
+                                  <span class="badge bg-primary">{{ tarea.calificacion }}</span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <!-- Detalles de exámenes -->
+                            <div *ngIf="evaluacion.examenes && evaluacion.examenes.length > 0" class="mb-2">
+                              <h6 class="small text-warning mb-1">
+                                <i class="bi bi-file-earmark-text me-1"></i>Exámenes:
+                              </h6>
+                              <div class="d-flex flex-wrap gap-1">
+                                <span class="badge bg-warning text-dark small" *ngFor="let examen of evaluacion.examenes; let j = index">
+                                  {{ examen }}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <!-- Resultado final -->
+                            <div class="border-top pt-1 mt-2">
+                              <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">Estado:</small>
+                                <small [ngClass]="getPromedioClass(evaluacion.promedio)">
+                                  {{ evaluacion.promedio >= 6 ? 'Aprobado' : 'Reprobado' }}
+                                </small>
+                              </div>
+                            </div>
+                            
+                            <!-- Botones de acción -->
+                            <div class="d-flex gap-1 mt-2">
+                              <button class="btn btn-sm btn-outline-primary flex-fill" (click)="editarEvaluacion(evaluacion)">
+                                <i class="bi bi-pencil"></i>
+                              </button>
+                              <button class="btn btn-sm btn-outline-danger flex-fill" (click)="eliminarEvaluacion(evaluacion.id)">
+                                <i class="bi bi-trash"></i>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vista individual (para estudiantes o cuando no hay datos agrupados) -->
+          <ng-template #vistaIndividual>
+            <div class="accordion" id="historialAccordion" *ngIf="historial && historial.length > 0">
+              <div class="accordion-item" *ngFor="let item of historial; let i = index">
+                <h2 class="accordion-header" [id]="'heading' + i">
                 <button class="accordion-button collapsed" type="button" 
                         data-bs-toggle="collapse" 
                         [attr.data-bs-target]="'#collapse' + i" 
@@ -384,7 +536,8 @@
                 </div>
               </div>
             </div>
-          </div>
+            </div>
+          </ng-template>
           
           <!-- Mensaje cuando no hay historial -->
           <div class="alert alert-info text-center mb-0" *ngIf="!historial || historial.length === 0">
