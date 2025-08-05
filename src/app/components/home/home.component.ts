@@ -24,6 +24,9 @@ export class HomeComponent implements OnInit, OnDestroy {
     evaluaciones: EvaluacionHistorial[] 
   } } = {};
   
+  // Mapa para almacenar nombres de profesores por ID
+  profesoresMap: { [id: string]: string } = {};
+  
   // Variables para edición
   modoEdicion = false;
   evaluacionEditando: EvaluacionHistorial | null = null;
@@ -69,16 +72,30 @@ export class HomeComponent implements OnInit, OnDestroy {
   cargarHistorial() {
     if (!this.usuarioActual) return;
     
-    const historialQuery = query(
-      this.historialCollection,
-      where('usuarioId', '==', this.usuarioActual.id)
-    );
+    let historialQuery;
+    
+    if (this.usuarioActual.tipoUsuario === 'profesor') {
+      // Los profesores ven todas las evaluaciones que han creado
+      historialQuery = query(
+        this.historialCollection,
+        where('profesorId', '==', this.usuarioActual.id)
+      );
+    } else {
+      // Los estudiantes solo ven sus propias evaluaciones
+      historialQuery = query(
+        this.historialCollection,
+        where('usuarioId', '==', this.usuarioActual.id)
+      );
+    }
     
     collectionData(historialQuery, { idField: 'id' }).subscribe((data: any[]) => {
       this.historial = data.map(item => ({
         ...item,
         fecha: item.fecha?.toDate ? item.fecha.toDate() : new Date(item.fecha)
       })).sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()); // Ordenar en el cliente
+      
+      // Cargar nombres de profesores para el historial
+      this.cargarNombresProfesores();
       
       // Extraer materias únicas para autocompletado
       this.extraerMateriasYTareas();
@@ -108,10 +125,39 @@ export class HomeComponent implements OnInit, OnDestroy {
     });
   }
 
+  cargarNombresProfesores() {
+    // Extraer IDs únicos de profesores del historial
+    const profesorIds = new Set<string>();
+    this.historial.forEach(evaluacion => {
+      if (evaluacion.profesorId) {
+        profesorIds.add(evaluacion.profesorId);
+      }
+    });
+
+    // Si hay profesores para cargar
+    if (profesorIds.size > 0) {
+      const usuariosCollection = collection(this.firestore, 'usuarios');
+      const profesoresQuery = query(
+        usuariosCollection,
+        where('tipoUsuario', '==', 'profesor')
+      );
+
+      collectionData(profesoresQuery, { idField: 'id' }).subscribe((data: any[]) => {
+        const profesores = data as Usuario[];
+        // Llenar el mapa con los nombres de los profesores
+        profesores.forEach(profesor => {
+          if (profesorIds.has(profesor.id)) {
+            this.profesoresMap[profesor.id] = profesor.name;
+          }
+        });
+      });
+    }
+  }
+
   private actualizarGraficaGlobal() {
     const labels: string[] = [];
-    const datos: number[] = [];
-    const colores: string[] = [];
+    const datosAprobados: number[] = [];
+    const datosReprobados: number[] = [];
 
     // Colores para diferentes tipos de evaluación
     const coloresTipo = {
@@ -120,30 +166,28 @@ export class HomeComponent implements OnInit, OnDestroy {
       'examen': 'rgba(255, 99, 132, 0.7)'         // Rojo
     };
 
-    // Si es profesor y hay datos agrupados, usar vista agrupada
+    // Si es profesor y hay datos agrupados, usar vista agrupada con proporción
     if (this.usuarioActual?.tipoUsuario === 'profesor' && Object.keys(this.historialAgrupado).length > 0) {
       Object.keys(this.historialAgrupado).forEach(key => {
         const grupo = this.historialAgrupado[key];
         
-        // Verificar si hay estudiantes reprobados (promedio < 6)
+        // Contar estudiantes aprobados y reprobados
         const estudiantesReprobados = grupo.evaluaciones.filter(ev => ev.promedio < 6);
-        const hayReprobados = estudiantesReprobados.length > 0;
+        const estudiantesAprobados = grupo.evaluaciones.filter(ev => ev.promedio >= 6);
+        const totalEstudiantes = grupo.evaluaciones.length;
         
-        // Crear label con información adicional
+        // Crear label con información de estudiantes
         let label = `${grupo.materia} (${this.getTipoDisplay(grupo.tipo)})`;
-        if (hayReprobados) {
-          label += ` - ${estudiantesReprobados.length} reprobado(s)`;
-        }
+        label += ` - ${totalEstudiantes} estudiante(s)`;
         
         labels.push(label);
-        datos.push(grupo.promedioGeneral);
         
-        // Color rojo si hay reprobados, sino color normal según tipo
-        if (hayReprobados) {
-          colores.push('rgba(220, 53, 69, 0.7)'); // Rojo para grupos con reprobados
-        } else {
-          colores.push(coloresTipo[grupo.tipo as keyof typeof coloresTipo] || 'rgba(75, 192, 192, 0.7)');
-        }
+        // Calcular porcentajes para mostrar proporción
+        const porcentajeAprobados = totalEstudiantes > 0 ? (estudiantesAprobados.length / totalEstudiantes) * 100 : 0;
+        const porcentajeReprobados = totalEstudiantes > 0 ? (estudiantesReprobados.length / totalEstudiantes) * 100 : 0;
+        
+        datosAprobados.push(porcentajeAprobados);
+        datosReprobados.push(porcentajeReprobados);
       });
     } else {
       // Vista individual (para estudiantes o cuando no hay agrupación)
@@ -157,37 +201,79 @@ export class HomeComponent implements OnInit, OnDestroy {
           label += ` (${fechaStr})`;
           
           labels.push(label);
-          datos.push(evaluacion.promedio);
           
-          // Color rojo si está reprobado, sino color normal según tipo
+          // Para estudiantes individuales, mostrar como 100% en la categoría correspondiente
           if (evaluacion.promedio < 6) {
-            colores.push('rgba(220, 53, 69, 0.7)'); // Rojo para reprobados
+            datosReprobados.push(100);
+            datosAprobados.push(0);
           } else {
-            colores.push(coloresTipo[evaluacion.tipo as keyof typeof coloresTipo] || 'rgba(75, 192, 192, 0.7)');
+            datosAprobados.push(100);
+            datosReprobados.push(0);
           }
         }
       });
     }
 
     // Si no hay historial, mostrar mensaje en la gráfica
-    if (datos.length === 0) {
+    if (labels.length === 0) {
       labels.push('Sin evaluaciones');
-      datos.push(0);
-      colores.push('rgba(200, 200, 200, 0.7)');
+      datosAprobados.push(0);
+      datosReprobados.push(0);
     }
 
-    // Actualizar la gráfica
+    // Actualizar la gráfica con datasets segmentados
     this.barChartData = {
       labels: [...labels],
       datasets: [
         {
-          label: this.usuarioActual?.tipoUsuario === 'profesor' ? 'Promedio General por Grupo' : 'Promedio por Materia',
-          data: [...datos],
-          backgroundColor: colores,
-          borderColor: colores.map(color => color.replace('0.7', '1')),
-          borderWidth: 1
+          label: 'Estudiantes Aprobados (%)',
+          data: [...datosAprobados],
+          backgroundColor: 'rgba(40, 167, 69, 0.7)', // Verde para aprobados
+          borderColor: 'rgba(40, 167, 69, 1)',
+          borderWidth: 1,
+          stack: 'stack1'
+        },
+        {
+          label: 'Estudiantes Reprobados (%)',
+          data: [...datosReprobados],
+          backgroundColor: 'rgba(220, 53, 69, 0.7)', // Rojo para reprobados
+          borderColor: 'rgba(220, 53, 69, 1)',
+          borderWidth: 1,
+          stack: 'stack1'
         }
       ]
+    };
+
+    // Actualizar opciones del gráfico para mostrar como stacked
+    this.barChartOptions = {
+      ...this.barChartOptions,
+      responsive: true,
+      scales: {
+        x: {
+          stacked: true,
+        },
+        y: {
+          stacked: true,
+          beginAtZero: true,
+          max: 100,
+          ticks: {
+            callback: function(value) {
+              return value + '%';
+            }
+          }
+        }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: function(context: any) {
+              const label = context.dataset.label || '';
+              const value = context.parsed.y;
+              return `${label}: ${value.toFixed(1)}%`;
+            }
+          }
+        }
+      }
     };
   }
 
@@ -279,17 +365,24 @@ export class HomeComponent implements OnInit, OnDestroy {
   async guardarEvaluacion(promedio: number, resultadoTexto: string) {
     if (!this.usuarioActual) return;
 
-    // Verificar si ya existe una evaluación de la misma materia y tipo
+    // Validar que haya nombre de estudiante
+    if (!this.nombre || !this.nombre.trim()) {
+      alert('Por favor ingresa el nombre del estudiante antes de evaluar.');
+      return;
+    }
+
+    // Verificar si ya existe una evaluación de la misma materia, tipo y estudiante
     const evaluacionExistente = this.historial.find(evaluacion => 
       evaluacion.materia.toLowerCase().trim() === this.materia.toLowerCase().trim() &&
       evaluacion.tipo === this.tipo &&
-      evaluacion.usuarioId === this.usuarioActual!.id
+      evaluacion.usuarioId === (this.usuarioActual?.tipoUsuario === 'profesor' && this.estudianteSeleccionadoId ? this.estudianteSeleccionadoId : this.usuarioActual!.id) &&
+      evaluacion.nombre.toLowerCase().trim() === this.nombre.toLowerCase().trim()
     );
 
     if (evaluacionExistente && !this.modoEdicion) {
       // Mostrar confirmación para actualizar o crear nueva
       const actualizar = confirm(
-        `Ya existe una evaluación de "${this.materia}" del tipo "${this.getTipoDisplay(this.tipo)}".\n\n` +
+        `Ya existe una evaluación de "${this.materia}" del tipo "${this.getTipoDisplay(this.tipo)}" para el estudiante "${this.nombre}".\n\n` +
         `¿Deseas actualizar la evaluación existente agregando estas nuevas tareas?\n\n` +
         `• Sí: Las nuevas tareas se agregarán a la evaluación existente\n` +
         `• No: Se creará una nueva evaluación separada`
@@ -303,7 +396,17 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     // Crear nueva evaluación (comportamiento original)
     const evaluacion = new EvaluacionHistorial();
-    evaluacion.usuarioId = this.usuarioActual.id;
+    
+    // Determinar el usuarioId correcto: si es profesor evaluando estudiante, usar ID del estudiante
+    if (this.usuarioActual?.tipoUsuario === 'profesor' && this.estudianteSeleccionadoId) {
+      evaluacion.usuarioId = this.estudianteSeleccionadoId;
+      evaluacion.profesorId = this.usuarioActual.id; // Rastrear quién creó la evaluación
+    } else {
+      // Si es estudiante autoevaluándose
+      evaluacion.usuarioId = this.usuarioActual.id;
+      // No se asigna profesorId para autoevaluaciones
+    }
+    
     evaluacion.fecha = new Date();
     evaluacion.nombre = this.nombre;
     evaluacion.materia = this.materia;
@@ -432,6 +535,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   estudiantesDisponibles: Usuario[] = [];
   estudiantesFiltrados: Usuario[] = [];
   mostrarSugerenciasEstudiantes = false;
+  estudianteSeleccionadoId: string = ''; // ID del estudiante al que se le va a asignar la calificación
 
   // Nuevos arrays para datos adicionales de las tareas
   titulosTareas: string[] = [''];
@@ -953,6 +1057,12 @@ export class HomeComponent implements OnInit, OnDestroy {
 
 
   evaluar(): void {
+    // Verificar que solo los profesores puedan evaluar
+    if (this.usuarioActual?.tipoUsuario !== 'profesor') {
+      alert('Solo los profesores pueden registrar evaluaciones.');
+      return;
+    }
+
     // Filtrar solo las calificaciones válidas (no vacías, no nulas, y mayores a 0)
     const calificacionesValidas = this.calificaciones.filter((cal): cal is number => cal != null && cal > 0);
     const examenesValidos = this.calExamenes.filter((ex): ex is number => ex != null && ex > 0);
@@ -1042,6 +1152,12 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   async eliminarEvaluacion(id: string) {
+    // Verificar que solo los profesores puedan eliminar evaluaciones
+    if (this.usuarioActual?.tipoUsuario !== 'profesor') {
+      alert('Solo los profesores pueden eliminar evaluaciones.');
+      return;
+    }
+
     if (confirm('¿Estás seguro de que quieres eliminar esta evaluación?')) {
       try {
         const docRef = doc(this.firestore, 'evaluaciones', id);
@@ -1055,6 +1171,12 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   editarEvaluacion(evaluacion: EvaluacionHistorial) {
+    // Verificar que solo los profesores puedan editar evaluaciones
+    if (this.usuarioActual?.tipoUsuario !== 'profesor') {
+      alert('Solo los profesores pueden editar evaluaciones.');
+      return;
+    }
+
     this.modoEdicion = true;
     this.evaluacionEditando = evaluacion;
     
@@ -1118,6 +1240,12 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   async actualizarEvaluacion() {
+    // Verificar que solo los profesores puedan actualizar evaluaciones
+    if (this.usuarioActual?.tipoUsuario !== 'profesor') {
+      alert('Solo los profesores pueden actualizar evaluaciones.');
+      return;
+    }
+
     if (!this.evaluacionEditando || !this.evaluacionEditando.id) return;
 
     // Recalcular el promedio con los nuevos datos
@@ -1198,6 +1326,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   private limpiarFormulario() {
     this.nombre = '';
     this.correoAlumno = '';
+    this.estudianteSeleccionadoId = ''; // Limpiar ID del estudiante seleccionado
     this.materia = '';
     this.tipo = 'tareas';
     this.calificaciones = [null];
@@ -1272,12 +1401,18 @@ export class HomeComponent implements OnInit, OnDestroy {
     const materiaKey = materia.toLowerCase().trim();
     const tareasPrevias = this.tareasPreviasMaterias[materiaKey] || [];
     
-    // Buscar evaluación existente de la misma materia y tipo
-    this.evaluacionExistenteInfo = this.historial.find(evaluacion => 
-      evaluacion.materia.toLowerCase().trim() === materiaKey &&
-      evaluacion.tipo === this.tipo &&
-      evaluacion.usuarioId === this.usuarioActual!.id
-    ) || null;
+    // Buscar evaluación existente de la misma materia, tipo y estudiante
+    // Solo verificar si hay nombre de estudiante
+    if (this.nombre && this.nombre.trim()) {
+      this.evaluacionExistenteInfo = this.historial.find(evaluacion => 
+        evaluacion.materia.toLowerCase().trim() === materiaKey &&
+        evaluacion.tipo === this.tipo &&
+        evaluacion.usuarioId === (this.usuarioActual?.tipoUsuario === 'profesor' && this.estudianteSeleccionadoId ? this.estudianteSeleccionadoId : this.usuarioActual!.id) &&
+        evaluacion.nombre.toLowerCase().trim() === this.nombre.toLowerCase().trim()
+      ) || null;
+    } else {
+      this.evaluacionExistenteInfo = null;
+    }
     
     if (tareasPrevias.length > 0) {
       // Mostrar las tareas previas como sugerencias para que el usuario pueda elegir
@@ -1341,7 +1476,13 @@ export class HomeComponent implements OnInit, OnDestroy {
   seleccionarEstudiante(estudiante: Usuario) {
     this.correoAlumno = estudiante.email;
     this.nombre = estudiante.name;
+    this.estudianteSeleccionadoId = estudiante.id; // Guardar el ID del estudiante
     this.mostrarSugerenciasEstudiantes = false;
+    
+    // Actualizar verificación de evaluaciones existentes si hay materia seleccionada
+    if (this.materia && this.materia.trim()) {
+      this.cargarTareasPrevias(this.materia);
+    }
   }
 
   ocultarSugerenciasEstudiantes() {
@@ -1362,9 +1503,18 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     if (estudiante) {
       this.nombre = estudiante.name;
+      this.estudianteSeleccionadoId = estudiante.id; // Guardar el ID del estudiante
+      
+      // Actualizar verificación de evaluaciones existentes si hay materia seleccionada
+      if (this.materia && this.materia.trim()) {
+        this.cargarTareasPrevias(this.materia);
+      }
     } else {
-      // Si no se encuentra el estudiante, limpiar el nombre
+      // Si no se encuentra el estudiante, limpiar el nombre y el ID
       this.nombre = '';
+      this.estudianteSeleccionadoId = '';
+      // Limpiar también la información de evaluación existente
+      this.evaluacionExistenteInfo = null;
     }
   }
 
@@ -1387,6 +1537,17 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   }
 
+  // Método que se llama cuando cambia el nombre del estudiante
+  onNombreChange() {
+    // Actualizar verificación de evaluaciones existentes si hay materia seleccionada
+    if (this.materia && this.materia.trim() && this.nombre && this.nombre.trim()) {
+      this.cargarTareasPrevias(this.materia);
+    } else if (!this.nombre || !this.nombre.trim()) {
+      // Limpiar la información de evaluación existente si no hay nombre
+      this.evaluacionExistenteInfo = null;
+    }
+  }
+
   // Función helper para obtener las claves del historial agrupado
   getHistorialAgrupadoKeys(): string[] {
     return Object.keys(this.historialAgrupado).sort((a, b) => {
@@ -1403,5 +1564,11 @@ export class HomeComponent implements OnInit, OnDestroy {
   // Función helper para determinar si mostrar vista agrupada o individual
   mostrarVistaAgrupada(): boolean {
     return this.usuarioActual?.tipoUsuario === 'profesor' && Object.keys(this.historialAgrupado).length > 0;
+  }
+
+  // Función helper para obtener el nombre del profesor
+  getNombreProfesor(profesorId?: string): string {
+    if (!profesorId) return 'Sin profesor asignado';
+    return this.profesoresMap[profesorId] || 'Profesor desconocido';
   }
 }
